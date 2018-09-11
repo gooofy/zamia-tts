@@ -1,0 +1,31 @@
+zamia-tts
+---------
+
+Experimental Tacotron / Mimic2 based speech synthesizer. Goal (for now) is Python 2 compatibility, creating
+a re-usable Python package and performance.
+
+Links
+~~~~~
+
+* https://github.com/keithito/tacotron
+* https://mycroft.ai/blog/mimic-2-is-live/
+
+Requirements
+~~~~~~~~~~~~
+
+* Python 2
+* Tensorflow
+
+License
+~~~~~~~
+
+My own code is Apache-2.0 licensed unless otherwise noted in the script's copyright
+headers.
+
+Authors
+~~~~~~~
+
+Guenter Bartsch <guenter@zamia.org>
+Keith Ito
+MycroftAI
+
