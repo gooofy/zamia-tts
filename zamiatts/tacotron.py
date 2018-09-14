@@ -55,6 +55,7 @@ class Tacotron():
         of steps in the output time series, F is num_freq, and values are entries in the linear
         spectrogram. Only needed for training.
     '''
+
     with tf.variable_scope('inference') as scope:
       is_training = linear_targets is not None
       batch_size = tf.shape(inputs)[0]

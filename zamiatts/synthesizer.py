@@ -33,9 +33,6 @@ from zamiatts         import text_to_sequence
 from .                import audio
 from .tacotron        import Tacotron
 
-def find_alignment_endpoint(alignment_shape, ratio):
-    return int(math.ceil(alignment_shape[1] * ratio))
-
 class Synthesizer:
 
     def load(self, checkpoint_path, model_name='tacotron'):
@@ -44,8 +41,6 @@ class Synthesizer:
         with tf.variable_scope('model') as scope:
             self.model = Tacotron(hparams)
             self.model.initialize(inputs, input_lengths)
-            self.wav_output = audio.inv_spectrogram_tensorflow(
-                self.model.linear_outputs[0])
             self.alignment = self.model.alignments[0]
 
         logging.info('Loading checkpoint: %s' % checkpoint_path)
@@ -62,28 +57,28 @@ class Synthesizer:
 
         cleaner_names = [x.strip() for x in hparams.cleaners.split(',')]
         seq = text_to_sequence(text, cleaner_names)
+
         feed_dict = {
             self.model.inputs: [np.asarray(seq, dtype=np.int32)],
             self.model.input_lengths: np.asarray([len(seq)], dtype=np.int32)
         }
 
         logging.debug(u'%fs self.session.run...' % (time()-time_start))
-        wav, alignment = self.session.run(
-            [self.wav_output, self.alignment],
+        spectrogram = self.session.run(
+            self.model.linear_outputs[0],
             feed_dict=feed_dict
         )
 
-        logging.debug(u'%fs audio.find_endpoint...' % (time()-time_start))
-        audio_endpoint = audio.find_endpoint(wav)
+        np.set_printoptions(threshold=np.inf)
 
-        logging.debug(u'%fs find_alignment_endpoint...' % (time()-time_start))
-        alignment_endpoint = find_alignment_endpoint(
-            alignment.shape, float(audio_endpoint) / len(wav)
-        )
+        logging.debug(u'%fs audio.inv_spectrogram...' % (time()-time_start))
+        wav = audio.inv_spectrogram(spectrogram.T)
+
+        logging.debug(u'%fs audio.find_endpoint...' % (time()-time_start))
 
         logging.debug(u'%fs wav...' % (time()-time_start))
+        audio_endpoint = audio.find_endpoint(wav)
         wav = wav[:audio_endpoint]
-        alignment = alignment[:, :alignment_endpoint]
 
-        return wav, alignment
+        return wav
 

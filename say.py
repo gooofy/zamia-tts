@@ -39,7 +39,7 @@ from zamiatts.synthesizer import Synthesizer
 
 PROC_TITLE      = 'say'
 
-MODEL_PATH      = 'model/model.ckpt-57627'
+MODEL_PATH      = 'model/model.ckpt-107000'
 OUTPUT_WAV      = 'synth.wav'
 
 #
@@ -75,7 +75,7 @@ synth.load(MODEL_PATH)
 for i, txt in enumerate(args):
 
     logging.info('Synthesizing: %s' % txt)
-    wav, alignment = synth.synthesize(txt)
+    wav = synth.synthesize(txt)
 
     # import pdb; pdb.set_trace()
 
