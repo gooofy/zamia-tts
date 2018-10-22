@@ -63,14 +63,14 @@ def stft(y, n_fft=2048, hop_length=None, win_length=None, window='hann',
     fft_window = fft_window.reshape((-1, 1))
 
     # Check audio is valid
-    valid_audio(y)
+    _valid_audio(y)
 
     # Pad the time series so that frames are centered
     if center:
         y = np.pad(y, int(n_fft // 2), mode=pad_mode)
 
     # Window the time series.
-    y_frames = frame(y, frame_length=n_fft, hop_length=hop_length)
+    y_frames = _frame(y, frame_length=n_fft, hop_length=hop_length)
 
     # Pre-allocate the STFT matrix
     stft_matrix = np.empty((int(1 + n_fft // 2), y_frames.shape[1]),
@@ -211,7 +211,7 @@ def pad_center(data, size, axis=-1, **kwargs):
 
     return np.pad(data, lengths, **kwargs)
 
-def valid_audio(y, mono=True):
+def _valid_audio(y, mono=True):
 
     if not isinstance(y, np.ndarray):
         raise Exception('data must be of type numpy.ndarray')
@@ -232,7 +232,7 @@ def valid_audio(y, mono=True):
 
     return True
 
-def frame(y, frame_length=2048, hop_length=512):
+def _frame(y, frame_length=2048, hop_length=512):
     if not isinstance(y, np.ndarray):
         raise Exception('Input must be of type numpy.ndarray, '
                              'given type(y)={}'.format(type(y)))
@@ -585,6 +585,108 @@ def save_wav(wav, wavfn):
     wav16 = (32767 * wav).astype(np.int16)
 
     scipy.io.wavfile.write(wavfn, hparams['sample_rate'], wav16)
+
+def _to_mono(y):
+
+    # Validate the buffer.  Stereo is ok here.
+    _valid_audio(y, mono=False)
+
+    if y.ndim > 1:
+        y = np.mean(y, axis=0)
+
+    return y
+
+def _rmse(y, frame_length=2048, hop_length=512,
+          center=True, pad_mode='reflect'):
+
+    if center:
+        y = np.pad(y, int(frame_length // 2), mode=pad_mode)
+
+    x = _frame(y,
+               frame_length=frame_length,
+               hop_length=hop_length)
+
+    return np.sqrt(np.mean(np.abs(x)**2, axis=0, keepdims=True))
+
+def _power_to_db(S, ref=1.0, amin=1e-10, top_db=80.0):
+
+    S = np.asarray(S)
+
+    if amin <= 0:
+        raise Exception('amin must be strictly positive')
+
+    if np.issubdtype(S.dtype, np.complexfloating):
+        warnings.warn('power_to_db was called on complex input so phase '
+                      'information will be discarded. To suppress this warning, '
+                      'call power_to_db(np.abs(D)**2) instead.')
+        magnitude = np.abs(S)
+    else:
+        magnitude = S
+
+    if six.callable(ref):
+        # User supplied a function to calculate reference power
+        ref_value = ref(magnitude)
+    else:
+        ref_value = np.abs(ref)
+
+    log_spec = 10.0 * np.log10(np.maximum(amin, magnitude))
+    log_spec -= 10.0 * np.log10(np.maximum(amin, ref_value))
+
+    if top_db is not None:
+        if top_db < 0:
+            raise Exception('top_db must be non-negative')
+        log_spec = np.maximum(log_spec, log_spec.max() - top_db)
+
+    return log_spec
+
+def _signal_to_frame_nonsilent(y, frame_length=2048, hop_length=512, top_db=60, ref=np.max):
+
+    # Convert to mono
+    y_mono = _to_mono(y)
+
+    # Compute the MSE for the signal
+    mse = _rmse(y_mono,
+                frame_length=frame_length,
+                hop_length=hop_length)**2
+
+    return _power_to_db(mse.squeeze(), ref=ref, top_db=None) > -top_db
+
+def _frames_to_samples(frames, hop_length=512, n_fft=None):
+    offset = 0
+    if n_fft is not None:
+        offset = int(n_fft // 2)
+
+    return (np.asanyarray(frames) * hop_length + offset).astype(int)
+
+
+def _trim(y, top_db=60, ref=np.max, frame_length=2048, hop_length=512):
+    non_silent = _signal_to_frame_nonsilent(y,
+                                            frame_length=frame_length,
+                                            hop_length=hop_length,
+                                            ref=ref,
+                                            top_db=top_db)
+
+    nonzero = np.flatnonzero(non_silent)
+
+    if nonzero.size > 0:
+        # Compute the start and end positions
+        # End position goes one frame past the last non-zero
+        start = int(_frames_to_samples(nonzero[0], hop_length))
+        end = min(y.shape[-1], int(_frames_to_samples(nonzero[-1] + 1, hop_length)))
+    else:
+        # The signal only contains zeros
+        start, end = 0, 0
+
+    # Build the mono/stereo index
+    full_index = [slice(None)] * y.ndim
+    full_index[-1] = slice(start, end)
+
+    return y[tuple(full_index)], np.asarray([start, end])
+
+
+def trim_silence(wav):
+    return _trim( wav, top_db=hparams['trim_top_db'], frame_length=hparams['trim_fft_size'], hop_length=hparams['trim_hop_size'])[0]
+
 
 #########################################################################
 # 
