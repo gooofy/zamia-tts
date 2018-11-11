@@ -42,8 +42,8 @@ from nltools           import misc
 from zamiatts          import DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_YL, cleanup_text
 from zamiatts          import audio
 
-# DEBUG_LIMIT  = 0
-DEBUG_LIMIT = 65
+DEBUG_LIMIT  = 0
+# DEBUG_LIMIT = 65
 
 PROC_TITLE      = 'train_prepare'
 
