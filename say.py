@@ -27,6 +27,8 @@ import os
 import re
 import sys
 import logging
+import json
+import codecs
 
 import scipy.io.wavfile
 import numpy as np
@@ -34,12 +36,14 @@ import numpy as np
 from optparse             import OptionParser
 
 from nltools              import misc
-from zamiatts.hparams     import hparams
-from zamiatts.synthesizer import Synthesizer
+# from zamiatts.hparams     import hparams
+# from zamiatts.synthesizer import Synthesizer
+from zamiatts.tacotron    import Tacotron
 
 PROC_TITLE      = 'say'
 
-MODEL_PATH      = 'model/model.ckpt-107000'
+VOICE           = 'voices/karlsson'
+
 OUTPUT_WAV      = 'synth.wav'
 
 #
@@ -69,13 +73,16 @@ if len(args) != 1:
     parser.print_usage()
     sys.exit(1)
 
-synth = Synthesizer()
-synth.load(MODEL_PATH)
+# with codecs.open('hparams.json', 'w', 'utf8') as hpf:
+#     hpf.write(json.dumps(hparams))
+
+
+taco = Tacotron(VOICE, is_training=False)
 
 for i, txt in enumerate(args):
 
     logging.info('Synthesizing: %s' % txt)
-    wav = synth.synthesize(txt)
+    wav = taco.say(txt)
 
     # import pdb; pdb.set_trace()
 
@@ -83,8 +90,6 @@ for i, txt in enumerate(args):
 
     wavfn = '%d.wav' % i
 
-    scipy.io.wavfile.write(wavfn, hparams.sample_rate, wav16)
+    scipy.io.wavfile.write(wavfn, taco.hp['sample_rate'], wav16)
 
     logging.info("%s written." % wavfn)
-
-

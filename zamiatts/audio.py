@@ -31,13 +31,12 @@ import scipy.fftpack as fft
 import logging
 import wave
 import struct
-from hparams import hparams
 from numpy.lib.stride_tricks import as_strided
 
 # Constrain STFT block sizes to 256 KB
 MAX_MEM_BLOCK = 2**8 * 2**10
 
-def _stft_parameters():
+def stft_parameters(hparams):
     n_fft      = (hparams['num_freq'] - 1) * 2
     hop_length = int(hparams['frame_shift_ms']  / 1000.0 * hparams['sample_rate'])
     win_length = int(hparams['frame_length_ms'] / 1000.0 * hparams['sample_rate'])
@@ -137,8 +136,9 @@ def istft(stft_matrix, hop_length=None, win_length=None, window='hann',
 
     return y
 
-def _griffin_lim(S, griffin_lim_iters):
-    n_fft, hop_length, win_length = _stft_parameters()
+def _griffin_lim(S, hparams):
+    n_fft, hop_length, win_length = stft_parameters(hparams)
+    griffin_lim_iters = hparams['griffin_lim_iters']
 
     # print '_griffin_lim: S.shape:', S.shape
 
@@ -155,13 +155,13 @@ def _griffin_lim(S, griffin_lim_iters):
 
     return y
 
-def inv_spectrogram(spectrogram, griffin_lim_iters):
-    S = _db_to_amp(_denormalize(spectrogram) + hparams['ref_level_db'])  # Convert back to linear
+def inv_spectrogram(spectrogram, hparams):
+    S = _db_to_amp(_denormalize(spectrogram, hparams) + hparams['ref_level_db'])  # Convert back to linear
     # Reconstruct phase
-    return _griffin_lim(S ** hparams['power'], griffin_lim_iters)
+    return _griffin_lim(S ** hparams['power'], hparams)
 
-def spectrogram(y):
-    n_fft, hop_length, win_length = _stft_parameters()
+def spectrogram(y, hparams):
+    n_fft, hop_length, win_length = stft_parameters(hparams)
     D = stft(y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
     S = _amp_to_db(np.abs(D)) - hparams['ref_level_db']
     res = _normalize(S)
@@ -170,13 +170,13 @@ def spectrogram(y):
 
     return res
 
-def melspectrogram(y):
-    n_fft, hop_length, win_length = _stft_parameters()
+def melspectrogram(y, hparams):
+    n_fft, hop_length, win_length = stft_parameters(hparams)
     D = stft(y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
     S = _amp_to_db(_linear_to_mel(np.abs(D))) - hparams['ref_level_db']
     return _normalize(S)
 
-def find_endpoint(wav, threshold_db=-40, min_silence_sec=0.5):
+def find_endpoint(wav, hparams, threshold_db=-40, min_silence_sec=0.5):
     window_length = int(hparams['sample_rate'] * min_silence_sec)
     hop_length = int(window_length / 4)
     threshold = _db_to_amp(threshold_db)
@@ -549,7 +549,7 @@ def _db_to_amp(x):
 def _normalize(S):
     return np.clip((S - hparams['min_level_db']) / -hparams['min_level_db'], 0, 1)
 
-def _denormalize(S):
+def _denormalize(S, hparams):
     return (np.clip(S, 0, 1) * -hparams['min_level_db']) + hparams['min_level_db']
 
 def load_wav(wavfn):
@@ -793,9 +793,9 @@ def _spsi(msgram, fftsize, hop_length, center=True) :
 
     return y_out
 
-def inv_spectrogram_spsi(spectrogram):
+def inv_spectrogram_spsi(spectrogram, hparams):
     S = _db_to_amp(_denormalize(spectrogram) + hparams['ref_level_db'])  # Convert back to linear
-    n_fft, hop_length, win_length = _stft_parameters()
+    n_fft, hop_length, win_length = stft_parameters(hparams)
     return _spsi(S ** hparams['power'], n_fft, hop_length)
 
 def inv_spectrogram_spsi2(spectrogram, griffin_lim_iters):
@@ -804,7 +804,7 @@ def inv_spectrogram_spsi2(spectrogram, griffin_lim_iters):
 
     # print 'inv_spectrogram_spsi2: S.shape:', S.shape
 
-    n_fft, hop_length, win_length = _stft_parameters()
+    n_fft, hop_length, win_length = stft_parameters(hparams)
     y = _spsi(S, n_fft, hop_length)
 
     # print 'inv_spectrogram_spsi2: y.shape:', y.shape
