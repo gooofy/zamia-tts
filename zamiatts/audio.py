@@ -164,7 +164,7 @@ def spectrogram(y, hparams):
     n_fft, hop_length, win_length = stft_parameters(hparams)
     D = stft(y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
     S = _amp_to_db(np.abs(D)) - hparams['ref_level_db']
-    res = _normalize(S)
+    res = _normalize(S, hparams)
 
     # logging.info ('spectrogram y:%s D:%s S:%s res:%s' % (y.shape, D.shape, S.shape, res.shape))
 
@@ -173,8 +173,8 @@ def spectrogram(y, hparams):
 def melspectrogram(y, hparams):
     n_fft, hop_length, win_length = stft_parameters(hparams)
     D = stft(y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
-    S = _amp_to_db(_linear_to_mel(np.abs(D))) - hparams['ref_level_db']
-    return _normalize(S)
+    S = _amp_to_db(_linear_to_mel(np.abs(D), hparams)) - hparams['ref_level_db']
+    return _normalize(S, hparams)
 
 def find_endpoint(wav, hparams, threshold_db=-40, min_silence_sec=0.5):
     window_length = int(hparams['sample_rate'] * min_silence_sec)
@@ -412,10 +412,10 @@ def window_sumsquare(window, n_frames, hop_length=512, win_length=None, n_fft=20
 
 _mel_basis = None
 
-def _linear_to_mel(spectrogram):
+def _linear_to_mel(spectrogram, hparams):
   global _mel_basis
   if _mel_basis is None:
-    _mel_basis = _build_mel_basis()
+    _mel_basis = _build_mel_basis(hparams)
   return np.dot(_mel_basis, spectrogram)
 
 def _fft_frequencies(sr=22050, n_fft=2048):
@@ -535,7 +535,7 @@ def _mel(sr, n_fft, n_mels=128, fmin=0.0, fmax=None, htk=False, norm=1):
 
     return weights
 
-def _build_mel_basis():
+def _build_mel_basis(hparams):
     n_fft = (hparams['num_freq'] - 1) * 2
     return _mel(hparams['sample_rate'], n_fft, n_mels=hparams['num_mels'],
                 fmin=hparams['min_mel_freq'], fmax=hparams['max_mel_freq'])
@@ -546,7 +546,7 @@ def _amp_to_db(x):
 def _db_to_amp(x):
     return np.power(10.0, x * 0.05)
 
-def _normalize(S):
+def _normalize(S, hparams):
     return np.clip((S - hparams['min_level_db']) / -hparams['min_level_db'], 0, 1)
 
 def _denormalize(S, hparams):
@@ -684,7 +684,7 @@ def _trim(y, top_db=60, ref=np.max, frame_length=2048, hop_length=512):
     return y[tuple(full_index)], np.asarray([start, end])
 
 
-def trim_silence(wav):
+def trim_silence(wav, hparams):
     return _trim( wav, top_db=hparams['trim_top_db'], frame_length=hparams['trim_fft_size'], hop_length=hparams['trim_hop_size'])[0]
 
 
