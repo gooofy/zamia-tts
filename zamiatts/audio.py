@@ -580,7 +580,7 @@ def load_wav(wavfn):
 
     return np.asarray(samples, dtype=np.float32) / 32768.0
 
-def save_wav(wav, wavfn):
+def save_wav(wav, wavfn, hparams):
 
     wav16 = (32767 * wav).astype(np.int16)
 

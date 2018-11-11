@@ -491,6 +491,8 @@ class Tacotron:
 
         time_start = time()
 
+        # import pdb; pdb.set_trace()
+
         logging.debug(u'%fs synthesizing %s' % (time()-time_start, txt))
 
         input_data     = np.zeros( (1, self.hp['max_inp_len']), dtype='int32')
@@ -516,7 +518,7 @@ class Tacotron:
 
         logging.debug(u'%fs wav...' % (time()-time_start))
         audio_endpoint = audio.find_endpoint(wav, self.hp)
-        wav = wav[:audio_endpoint]
+        # wav = wav[:audio_endpoint]
 
         return wav
 

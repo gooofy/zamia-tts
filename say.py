@@ -36,9 +36,8 @@ import numpy as np
 from optparse             import OptionParser
 
 from nltools              import misc
-# from zamiatts.hparams     import hparams
-# from zamiatts.synthesizer import Synthesizer
 from zamiatts.tacotron    import Tacotron
+from zamiatts             import audio
 
 PROC_TITLE      = 'say'
 
@@ -84,12 +83,11 @@ for i, txt in enumerate(args):
     logging.info('Synthesizing: %s' % txt)
     wav = taco.say(txt)
 
-    # import pdb; pdb.set_trace()
-
-    wav16 = (32767*wav).astype(np.int16)
-
     wavfn = '%d.wav' % i
+    audio.save_wav(wav, wavfn, taco.hp)
 
-    scipy.io.wavfile.write(wavfn, taco.hp['sample_rate'], wav16)
+    # wav16 = (32767*wav).astype(np.int16)
+    # scipy.io.wavfile.write(wavfn, taco.hp['sample_rate'], wav16)
 
     logging.info("%s written." % wavfn)
+
