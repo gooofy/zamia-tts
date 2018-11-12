@@ -26,19 +26,30 @@
 # * https://github.com/librosa/librosa
 #
 
+import os
 import logging
 import json
 import codecs
+import random
 
-import numpy      as np
-import tensorflow as tf
+import numpy             as np
+import tensorflow        as tf
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 from tensorflow.contrib.rnn     import GRUCell, RNNCell, MultiRNNCell, OutputProjectionWrapper, ResidualWrapper
 from tensorflow.contrib.seq2seq import AttentionWrapper, BahdanauAttention, Helper, BasicDecoder
 from time                       import time
 from nltools.tokenizer          import tokenize
+from .                          import DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_YL, VOICE_PATH, CHECKPOINT_FN, WAV_FN, SPEC_FN, ALIGN_FN
 
 import audio
+
+DEBUG_LIMIT        =   0
+# DEBUG_LIMIT        =   2 # debug only
+DEFAULT_NUM_EPOCHS = 300
 
 def _go_frames(batch_size, output_dim):
     '''Returns all-zero <GO> frames for a given batch size and output dimension'''
@@ -314,10 +325,11 @@ def _create_post_cbhg(inputs, input_dim, is_training, depth):
                          depth=depth)
 class Tacotron:
 
-    def __init__(self, voice_path, is_training):
+    def __init__(self, voice, is_training):
     
-        self.voice_path = voice_path
-        self.hpfn       = '%s/hparams.json' % voice_path
+        self.voice      = voice
+        self.voice_path = VOICE_PATH % voice
+        self.hpfn       = '%s/hparams.json' % self.voice_path
         with codecs.open(self.hpfn, 'r', 'utf8') as hpf:
             self.hp         = json.loads(hpf.read())
         self.batch_size = self.hp['batch_size'] if is_training else 1
@@ -325,8 +337,6 @@ class Tacotron:
         max_num_frames  = self.hp['max_iters'] * self.hp['outputs_per_step'] * self.hp['frame_shift_ms'] * self.hp['sample_rate'] / 1000
         n_fft, hop_length, win_length = audio.stft_parameters(self.hp)
         self.max_mfc_frames  = 1 + int((max_num_frames - n_fft) / hop_length)
-
-        # global inputs, input_lengths, global_step, loss, optimize, mel_targets, linear_targets, linear_outputs, target_lengths, alignments, saver
 
         # self.inputs        = tf.placeholder(dtype = tf.int32, shape = [None, self.hp['max_inp_len']])
         # self.input_lengths = tf.placeholder(dtype = tf.int32, shape = [None])
@@ -398,9 +408,9 @@ class Tacotron:
         logging.debug('decoder_init_state: %s' % repr(decoder_init_state))
 
         if is_training:
-          helper = TacoTrainingHelper(self.inputs, self.mel_targets, self.hp['num_mels'], self.hp['outputs_per_step'], self.target_lengths)
+            helper = TacoTrainingHelper(self.inputs, self.mel_targets, self.hp['num_mels'], self.hp['outputs_per_step'], self.target_lengths)
         else:
-          helper = TacoTestHelper(self.batch_size, self.hp['num_mels'], self.hp['outputs_per_step'])
+            helper = TacoTestHelper(self.batch_size, self.hp['num_mels'], self.hp['outputs_per_step'])
         logging.debug('helper: %s' % helper)
 
         (decoder_outputs, _), final_decoder_state, _ = tf.contrib.seq2seq.dynamic_decode(
@@ -423,12 +433,12 @@ class Tacotron:
         logging.debug('linear_outputs: %s' % self.linear_outputs)
 
         # Grab alignments from the final decoder state:
-        alignments = tf.transpose(final_decoder_state[0].alignment_history.stack(), [1, 2, 0])
-        logging.debug('alignments: %s' % alignments)
+        self.alignments = tf.transpose(final_decoder_state[0].alignment_history.stack(), [1, 2, 0])
+        logging.debug('alignments: %s' % self.alignments)
 
         if is_training:
 
-            global_step = tf.Variable(0, name='global_step', trainable=False)
+            self.global_step = tf.Variable(0, name='global_step', trainable=False)
 
             with tf.variable_scope('loss') as scope:
                 mel_loss = tf.reduce_mean(tf.abs(self.mel_targets - self.mel_outputs))
@@ -436,30 +446,36 @@ class Tacotron:
                 # Prioritize loss for frequencies under 3000 Hz.
                 n_priority_freq = int(3000 / (self.hp['sample_rate'] * 0.5) * self.hp['num_freq'])
                 linear_loss = 0.5 * tf.reduce_mean(l1) + 0.5 * tf.reduce_mean(l1[:,:,0:n_priority_freq])
-                loss = mel_loss + linear_loss
+                self.loss = mel_loss + linear_loss
 
             with tf.variable_scope('optimizer') as scope:
                 learning_rate = tf.train.exponential_decay(self.hp['initial_learning_rate'], 
-                                                           global_step, 
+                                                           self.global_step, 
                                                            self.hp['learning_rate_decay_halflife'], 
                                                            0.5)
                 optimizer = tf.train.AdamOptimizer(learning_rate, self.hp['adam_beta1'], self.hp['adam_beta2'])
-                gradients, variables = zip(*optimizer.compute_gradients(loss))
+                gradients, variables = zip(*optimizer.compute_gradients(self.loss))
                 clipped_gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
                 # Add dependency on UPDATE_OPS; otherwise batchnorm won't work correctly. See:
                 # https://github.com/tensorflow/tensorflow/issues/1122
                 with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-                    optimize = optimizer.apply_gradients(zip(clipped_gradients, variables), global_step=global_step)
+                    self.optimize = optimizer.apply_gradients(zip(clipped_gradients, variables), global_step=self.global_step)
 
         self.saver = tf.train.Saver(max_to_keep=5, keep_checkpoint_every_n_hours=2)
 
         self.sess  = tf.Session()
 
-        self.cpfn  = '%s/model' % voice_path
+        self.cpfn  = '%s/model' % self.voice_path
 
-        if not is_training:
+        if os.path.exists(self.cpfn):
             logging.debug ('restoring variables from %s ...' % self.cpfn)
             self.saver.restore(self.sess, self.cpfn)
+        else:
+            if is_training:
+                self.sess.run(tf.global_variables_initializer())
+            else:
+                raise Exception ("couldn't load model from %s" % self.cpfn)
+                
 
     def _decode_input(self, x):
 
@@ -522,4 +538,104 @@ class Tacotron:
 
         return wav
 
+    def _load_batch(self, batch_idx):
+
+        self.batch_x       = np.load(DSFN_X  % (self.voice, batch_idx))
+        self.batch_xl      = np.load(DSFN_XL % (self.voice, batch_idx))
+        self.batch_ys      = np.load(DSFN_YS % (self.voice, batch_idx))
+        self.batch_ym      = np.load(DSFN_YM % (self.voice, batch_idx))
+        self.batch_yl      = np.load(DSFN_YL % (self.voice, batch_idx))
+
+        ts = self._decode_input(self.batch_x[0])
+        logging.debug(u'ts %d %s' % (batch_idx, ts))
+
+    def _plot_alignment(self, alignment, path, info=None):
+        fig, ax = plt.subplots()
+        im = ax.imshow( alignment,
+                        aspect='auto',
+                        origin='lower',
+                        interpolation='none')
+        fig.colorbar(im, ax=ax)
+        xlabel = 'Decoder timestep'
+        if info is not None:
+            xlabel += '\n\n' + info
+        plt.xlabel(xlabel)
+        plt.ylabel('Encoder timestep')
+        plt.tight_layout()
+        plt.savefig(path, format='png')
+
+    def train(self, num_epochs=DEFAULT_NUM_EPOCHS):
+
+        logging.info ('counting numpy batches...')
+
+        num_batches = 0
+        while True:
+            if os.path.exists(DSFN_X % (self.voice, num_batches)):
+                num_batches += 1
+            else:
+                break
+
+        logging.info ('counting numpy batches... %d batches found.' % num_batches)
+
+        if DEBUG_LIMIT:
+            logging.warn ('limiting number of batches to %d for debugging' % DEBUG_LIMIT)
+            num_batches = DEBUG_LIMIT
+
+        self._load_batch(0) # make sure we have one batch loaded at all times so batch_*.shape works
+
+        batch_size = self.hp['batch_size']
+
+        batch_idxs = range(0, num_batches)
+
+        for epoch in range(num_epochs):
+
+            random.shuffle(batch_idxs)
+            epoch_loss = 0
+
+            for i, batch_idx in enumerate(batch_idxs):
+
+                self._load_batch(batch_idx)
+
+                step_out, loss_out, opt_out, spectrogram, alignment = self.sess.run([self.global_step, self.loss, self.optimize, self.linear_outputs, self.alignments],
+                                                                                    feed_dict={self.inputs         : self.batch_x, 
+                                                                                               self.input_lengths  : self.batch_xl,
+                                                                                               self.mel_targets    : self.batch_ym,
+                                                                                               self.linear_targets : self.batch_ys,
+                                                                                               self.target_lengths : self.batch_yl})
+
+                epoch_loss += loss_out
+
+                logging.info ('epoch: %5d, step %4d/%4d batch #%4d, loss: %7.5f, avg loss: %7.5f' % (epoch, i+1, num_batches, batch_idx, loss_out, epoch_loss / (i+1)))
+
+            cpfn = CHECKPOINT_FN % (self.voice, epoch)
+            logging.info('Saving checkpoint to: %s' % cpfn)
+            self.saver.save(self.sess, cpfn, global_step=step_out)
+
+            logging.info('Saving audio and alignment...')
+
+            # import pdb; pdb.set_trace()
+
+            # input_seq, spectrogram, alignment = sess.run([inputs, input_lengths, linear_outputs, alignments],
+            #                                              feed_dict={inputs         : eval_x,
+            #                                                         input_lengths  : eval_xl,
+            #                                                         mel_targets    : eval_ym,
+            #                                                         linear_targets : eval_ys})
+
+            waveform = audio.inv_spectrogram(spectrogram[0].T, self.hp)
+
+            wavfn = WAV_FN % (self.voice, epoch)
+            audio.save_wav(waveform, wavfn, self.hp)
+            logging.info('%s written.' % wavfn)
+
+            specfn = SPEC_FN % (self.voice, epoch)
+            cmd = 'sox %s -n spectrogram -o %s' % (wavfn, specfn)
+            logging.info(cmd)
+            os.system(cmd)
+
+            # import pdb; pdb.set_trace()
+
+            plotfn = ALIGN_FN % (self.voice, epoch)
+            self._plot_alignment(alignment[0], plotfn,
+                                 info='epoch=%d, loss=%.5f' % (epoch, loss_out))
+            logging.info ('alignment %s plotted to %s' % (alignment[0].shape, plotfn) )
 

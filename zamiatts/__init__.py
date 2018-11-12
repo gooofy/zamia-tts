@@ -27,12 +27,15 @@ DSFN_YS         = 'training/%s/ys_%04d.npy'
 DSFN_YM         = 'training/%s/ym_%04d.npy'
 DSFN_YL         = 'training/%s/yl_%04d.npy'
 
+VOICE_PATH      = 'voices/%s'
+CHECKPOINT_FN   = 'voices/%s/cp/cp%04d'
+WAV_FN          = 'voices/%s/eval/wav_%04d.wav'
+SPEC_FN         = 'voices/%s/eval/spec_%04d.png'
+ALIGN_FN        = 'voices/%s/eval/align_%04d.png'
+
 def cleanup_text (txt, lang, alphabet):
 
     tokens = map (lambda w: filter (lambda a: a in alphabet, w), tokenize(txt, lang=lang, keep_punctuation=True))
 
     return u' '.join(filter (lambda x: len(x)>0, tokens))
-
-
-
 

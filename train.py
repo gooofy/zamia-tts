@@ -4,7 +4,6 @@
 #
 # Copyright 2018 Guenter Bartsch
 # Copyright 2018 Keith Ito
-# Copyright 2018 MycroftAI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +19,7 @@
 #
 
 #
-# synthesize speech using a tacotron model
+#  tacotron model training frontend
 #
 
 import os
@@ -39,9 +38,9 @@ from nltools              import misc
 from zamiatts.tacotron    import Tacotron
 from zamiatts             import audio
 
-PROC_TITLE      = 'say'
+PROC_TITLE      = 'train'
 
-VOICE           = 'karlsson'
+VOICE           = 'voices/karlsson'
 
 #
 # init
@@ -53,7 +52,7 @@ misc.init_app(PROC_TITLE)
 # command line
 #
 
-parser = OptionParser("usage: %prog [options] <text>")
+parser = OptionParser("usage: %prog [options] voice")
 
 parser.add_option("-v", "--verbose", action="store_true", dest="verbose", 
                   help="enable debug output")
@@ -70,22 +69,9 @@ if len(args) != 1:
     parser.print_usage()
     sys.exit(1)
 
-# with codecs.open('hparams.json', 'w', 'utf8') as hpf:
-#     hpf.write(json.dumps(hparams))
+voice = args[0]
+taco = Tacotron(voice, is_training=True)
 
+taco.train()
 
-taco = Tacotron(VOICE, is_training=False)
-
-for i, txt in enumerate(args):
-
-    logging.info('Synthesizing: %s' % txt)
-    wav = taco.say(txt)
-
-    wavfn = '%d.wav' % i
-    audio.save_wav(wav, wavfn, taco.hp)
-
-    # wav16 = (32767*wav).astype(np.int16)
-    # scipy.io.wavfile.write(wavfn, taco.hp['sample_rate'], wav16)
-
-    logging.info("%s written." % wavfn)
 
