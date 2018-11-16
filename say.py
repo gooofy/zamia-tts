@@ -55,6 +55,9 @@ misc.init_app(PROC_TITLE)
 
 parser = OptionParser("usage: %prog [options] <text>")
 
+parser.add_option("-u", "--untrimmed-output", action="store_true", dest="untrimmed_output", 
+                  help="disable silence trimming")
+
 parser.add_option("-v", "--verbose", action="store_true", dest="verbose", 
                   help="enable debug output")
 
@@ -79,7 +82,7 @@ taco = Tacotron(VOICE, is_training=False)
 for i, txt in enumerate(args):
 
     logging.info('Synthesizing: %s' % txt)
-    wav = taco.say(txt)
+    wav = taco.say(txt, trim_silence=(not options.untrimmed_output))
 
     wavfn = '%d.wav' % i
     audio.save_wav(wav, wavfn, taco.hp)

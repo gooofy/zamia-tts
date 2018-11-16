@@ -325,10 +325,13 @@ def _create_post_cbhg(inputs, input_dim, is_training, depth):
                          depth=depth)
 class Tacotron:
 
-    def __init__(self, voice, is_training, eval_batch_size=1):
-    
+    def __init__(self, voice, is_training, eval_batch_size=1, write_debug_files=False):
+   
         self.voice      = voice
         self.voice_path = VOICE_PATH % voice
+
+        self.write_debug_files = write_debug_files
+
         self.hpfn       = '%s/hparams.json' % self.voice_path
         with codecs.open(self.hpfn, 'r', 'utf8') as hpf:
             self.hp         = json.loads(hpf.read())
@@ -508,7 +511,7 @@ class Tacotron:
 
         input_lengths[idx] = len(ts) + 1 # +1 for start symbol
 
-    def say(self, txt):
+    def say(self, txt, trim_silence=True):
 
         time_start = time()
 
@@ -523,10 +526,11 @@ class Tacotron:
 
         logging.debug('input_data=%s input_lengths=%s' % (input_data[0], input_lengths[0]))
 
-        np.save('say_x', input_data[0])
-        logging.debug ('say_x.npy written.')
-        np.save('say_xl', input_lengths[0])
-        logging.debug ('say_xl.npy written.')
+        if self.write_debug_files:
+            np.save('say_x', input_data[0])
+            logging.debug ('say_x.npy written.')
+            np.save('say_xl', input_lengths[0])
+            logging.debug ('say_xl.npy written.')
 
         logging.debug(u'%fs self.session.run...' % (time()-time_start))
         spectrograms = self.sess.run(fetches   = self.linear_outputs,
@@ -539,8 +543,9 @@ class Tacotron:
 
         logging.debug('spectrogram.shape=%s' % repr(spectrogram.shape))
 
-        np.save('say_spectrogram', spectrogram)
-        logging.debug ('say_spectrogram.npy written.')
+        if self.write_debug_files:
+            np.save('say_spectrogram', spectrogram)
+            logging.debug ('say_spectrogram.npy written.')
 
         # np.set_printoptions(threshold=np.inf)
 
@@ -550,8 +555,9 @@ class Tacotron:
         logging.debug(u'%fs audio.find_endpoint...' % (time()-time_start))
 
         logging.debug(u'%fs wav...' % (time()-time_start))
-        audio_endpoint = audio.find_endpoint(wav, self.hp)
-        # FIXME: wav = wav[:audio_endpoint]
+
+        if trim_silence:
+            wav = audio.trim_silence(wav, self.hp)
 
         return wav
 
@@ -658,7 +664,7 @@ class Tacotron:
 
 
 
-    def eval_batch(self, batch_idx):
+    def eval_batch(self, batch_idx, find_endpoint=True):
 
         self._load_batch(batch_idx)
 
@@ -668,10 +674,11 @@ class Tacotron:
 
         logging.debug('x[0]=%s xl[0]=%s' % (self.batch_x[0], self.batch_xl[0]))
 
-        np.save('eval_x', self.batch_x[0])
-        logging.debug ('eval_x.npy written.')
-        np.save('eval_xl', self.batch_xl[0])
-        logging.debug ('eval_xl.npy written.')
+        if self.write_debug_files:
+            np.save('eval_x', self.batch_x[0])
+            logging.debug ('eval_x.npy written.')
+            np.save('eval_xl', self.batch_xl[0])
+            logging.debug ('eval_xl.npy written.')
 
         logging.debug(u'%fs self.session.run...' % (time()-time_start))
         spectrograms = self.sess.run(fetches   = self.linear_outputs,
@@ -685,8 +692,9 @@ class Tacotron:
         logging.debug('spectrogram.shape=%s' % repr(spectrogram.shape))
         logging.debug('batch_ys.shape=%s' % repr(self.batch_ys.shape))
 
-        np.save('eval_spectrogram', spectrogram)
-        logging.debug ('eval_spectrogram.npy written.')
+        if self.write_debug_files:
+            np.save('eval_spectrogram', spectrogram)
+            logging.debug ('eval_spectrogram.npy written.')
 
         # np.set_printoptions(threshold=np.inf)
 
@@ -696,8 +704,9 @@ class Tacotron:
         logging.debug(u'%fs audio.find_endpoint...' % (time()-time_start))
 
         logging.debug(u'%fs wav...' % (time()-time_start))
-        audio_endpoint = audio.find_endpoint(wav, self.hp)
-        # FIXME: wav = wav[:audio_endpoint]
+        if find_endpoint:
+            audio_endpoint = audio.find_endpoint(wav, self.hp)
+            wav = wav[:audio_endpoint]
 
         return wav
 
