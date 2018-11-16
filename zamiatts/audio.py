@@ -142,6 +142,8 @@ def _griffin_lim(S, hparams):
 
     # print '_griffin_lim: S.shape:', S.shape
 
+    np.random.seed(42)
+
     angles = np.exp(2j * np.pi * np.random.rand(*S.shape))
     # print '_griffin_lim: angles.shape:', angles.shape
 
