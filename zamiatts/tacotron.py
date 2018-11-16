@@ -43,7 +43,7 @@ from tensorflow.contrib.rnn     import GRUCell, RNNCell, MultiRNNCell, OutputPro
 from tensorflow.contrib.seq2seq import AttentionWrapper, BahdanauAttention, Helper, BasicDecoder
 from time                       import time
 from nltools.tokenizer          import tokenize
-from .                          import DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_YL, VOICE_PATH, CHECKPOINT_FN, WAV_FN, SPEC_FN, ALIGN_FN
+from .                          import DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_YL, VOICE_PATH, CHECKPOINT_FN, WAV_FN, SPEC_FN, ALIGN_FN, cleanup_text
 
 import audio
 
@@ -325,14 +325,14 @@ def _create_post_cbhg(inputs, input_dim, is_training, depth):
                          depth=depth)
 class Tacotron:
 
-    def __init__(self, voice, is_training):
+    def __init__(self, voice, is_training, eval_batch_size=1):
     
         self.voice      = voice
         self.voice_path = VOICE_PATH % voice
         self.hpfn       = '%s/hparams.json' % self.voice_path
         with codecs.open(self.hpfn, 'r', 'utf8') as hpf:
             self.hp         = json.loads(hpf.read())
-        self.batch_size = self.hp['batch_size'] if is_training else 1
+        self.batch_size = self.hp['batch_size'] if is_training else eval_batch_size
 
         max_num_frames  = self.hp['max_iters'] * self.hp['outputs_per_step'] * self.hp['frame_shift_ms'] * self.hp['sample_rate'] / 1000
         n_fft, hop_length, win_length = audio.stft_parameters(self.hp)
@@ -467,7 +467,7 @@ class Tacotron:
 
         self.cpfn  = '%s/model' % self.voice_path
 
-        if os.path.exists(self.cpfn):
+        if os.path.exists('%s.index' % self.cpfn):
             logging.debug ('restoring variables from %s ...' % self.cpfn)
             self.saver.restore(self.sess, self.cpfn)
         else:
@@ -489,7 +489,9 @@ class Tacotron:
 
     def _encode_input (self, txt, idx, input_data, input_lengths):
 
-        ts = u' '.join(tokenize(txt, lang=self.hp['lang']))
+        ts = cleanup_text (txt, self.hp['lang'], self.hp['alphabet'])
+
+        logging.debug(u'ts=%s' % ts)
 
         for j, c in enumerate(ts):
             c_enc = self.hp['alphabet'].find(c)
@@ -500,6 +502,9 @@ class Tacotron:
             input_data[idx, j] = c_enc
 
         ts = self._decode_input(input_data[idx])
+        logging.debug(u'decoded input=%s' % ts)
+
+        # import pdb; pdb.set_trace()
 
         input_lengths[idx] = len(ts) + 1 # +1 for start symbol
 
@@ -507,14 +512,21 @@ class Tacotron:
 
         time_start = time()
 
-        # import pdb; pdb.set_trace()
-
         logging.debug(u'%fs synthesizing %s' % (time()-time_start, txt))
 
         input_data     = np.zeros( (1, self.hp['max_inp_len']), dtype='int32')
         input_lengths  = np.zeros( (1, ), dtype='int32')
 
+        logging.debug('input_data.shape=%s, input_lengths.shape=%s' % (input_data.shape, input_lengths.shape))
+
         self._encode_input(txt, 0, input_data, input_lengths)
+
+        logging.debug('input_data=%s input_lengths=%s' % (input_data[0], input_lengths[0]))
+
+        np.save('say_x', input_data[0])
+        logging.debug ('say_x.npy written.')
+        np.save('say_xl', input_lengths[0])
+        logging.debug ('say_xl.npy written.')
 
         logging.debug(u'%fs self.session.run...' % (time()-time_start))
         spectrograms = self.sess.run(fetches   = self.linear_outputs,
@@ -525,6 +537,11 @@ class Tacotron:
                                      )
         spectrogram = spectrograms[0]
 
+        logging.debug('spectrogram.shape=%s' % repr(spectrogram.shape))
+
+        np.save('say_spectrogram', spectrogram)
+        logging.debug ('say_spectrogram.npy written.')
+
         # np.set_printoptions(threshold=np.inf)
 
         logging.debug(u'%fs audio.inv_spectrogram...' % (time()-time_start))
@@ -534,7 +551,7 @@ class Tacotron:
 
         logging.debug(u'%fs wav...' % (time()-time_start))
         audio_endpoint = audio.find_endpoint(wav, self.hp)
-        # wav = wav[:audio_endpoint]
+        # FIXME: wav = wav[:audio_endpoint]
 
         return wav
 
@@ -638,4 +655,49 @@ class Tacotron:
             self._plot_alignment(alignment[0], plotfn,
                                  info='epoch=%d, loss=%.5f' % (epoch, loss_out))
             logging.info ('alignment %s plotted to %s' % (alignment[0].shape, plotfn) )
+
+
+
+    def eval_batch(self, batch_idx):
+
+        self._load_batch(batch_idx)
+
+        time_start = time()
+
+        logging.debug('input_data.shape=%s, input_lengths.shape=%s' % (self.batch_x.shape, self.batch_xl.shape))
+
+        logging.debug('x[0]=%s xl[0]=%s' % (self.batch_x[0], self.batch_xl[0]))
+
+        np.save('eval_x', self.batch_x[0])
+        logging.debug ('eval_x.npy written.')
+        np.save('eval_xl', self.batch_xl[0])
+        logging.debug ('eval_xl.npy written.')
+
+        logging.debug(u'%fs self.session.run...' % (time()-time_start))
+        spectrograms = self.sess.run(fetches   = self.linear_outputs,
+                                     feed_dict = {
+                                                  self.inputs       : self.batch_x,
+                                                  self.input_lengths: self.batch_xl,
+                                                 }
+                                     )
+        spectrogram = spectrograms[0]
+
+        logging.debug('spectrogram.shape=%s' % repr(spectrogram.shape))
+        logging.debug('batch_ys.shape=%s' % repr(self.batch_ys.shape))
+
+        np.save('eval_spectrogram', spectrogram)
+        logging.debug ('eval_spectrogram.npy written.')
+
+        # np.set_printoptions(threshold=np.inf)
+
+        logging.debug(u'%fs audio.inv_spectrogram...' % (time()-time_start))
+        wav = audio.inv_spectrogram(spectrogram.T, self.hp)
+
+        logging.debug(u'%fs audio.find_endpoint...' % (time()-time_start))
+
+        logging.debug(u'%fs wav...' % (time()-time_start))
+        audio_endpoint = audio.find_endpoint(wav, self.hp)
+        # FIXME: wav = wav[:audio_endpoint]
+
+        return wav
 
