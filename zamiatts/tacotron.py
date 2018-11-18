@@ -550,7 +550,7 @@ class Tacotron:
         # np.set_printoptions(threshold=np.inf)
 
         logging.debug(u'%fs audio.inv_spectrogram...' % (time()-time_start))
-        wav = audio.inv_spectrogram(spectrogram.T, self.hp)
+        wav = audio.inv_spectrogram(spectrogram.T, self.hp, use_fgla=True)
 
         logging.debug(u'%fs audio.find_endpoint...' % (time()-time_start))
 

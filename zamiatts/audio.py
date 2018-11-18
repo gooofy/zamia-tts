@@ -157,9 +157,38 @@ def _griffin_lim(S, hparams):
 
     return y
 
-def inv_spectrogram(spectrogram, hparams):
+# Perraudin, Nathanael et al. "A fast Griffin-Lim algorithm." 
+# 2013 IEEE Workshop on Applications of Signal Processing to Audio and Acoustics (2013): 1-4.  
+def _fgla(S, hparams, alpha=0.99):
+    n_fft, hop_length, win_length = stft_parameters(hparams)
+    griffin_lim_iters = hparams['fgla_iters']
+
+    def pc1(c):
+        y = istft(c, hop_length=hop_length, win_length=win_length)
+        return stft(y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+
+    def pc2(c):
+        return S_complex * (np.exp(1j * np.angle(c)))
+
+    S_complex = np.abs(S).astype(np.complex)
+    cn = S_complex * (np.exp(2j * np.pi * np.random.rand(*S.shape)))
+    tn = pc2(pc1(cn))
+
+    for i in range(griffin_lim_iters):
+
+        tnn = pc1(pc2(cn))
+        cn = tnn + alpha * (tnn - tn)
+
+        tn = tnn
+
+    y  = istft(cn, hop_length=hop_length, win_length=win_length)
+    return y
+
+def inv_spectrogram(spectrogram, hparams, use_fgla=True):
     S = _db_to_amp(_denormalize(spectrogram, hparams) + hparams['ref_level_db'])  # Convert back to linear
     # Reconstruct phase
+    if use_fgla:
+        return _fgla(S ** hparams['power'], hparams)
     return _griffin_lim(S ** hparams['power'], hparams)
 
 def spectrogram(y, hparams):
