@@ -48,7 +48,8 @@ DEBUG_LIMIT  = 0
 PROC_TITLE      = 'train_prepare'
 
 VOICE           = 'karlsson'
-MAILABSDIR      = '/home/bofh/projects/ai/data/speech/corpora/m_ailabs_de/de_DE/by_book/male/%s' % VOICE
+GENDER          = 'male'
+MAILABSDIR      = '/home/bofh/projects/ai/data/speech/corpora/m_ailabs_de/de_DE/by_book/%s/%s' % (GENDER, VOICE)
 LANG            = 'de'
 
 def _decode_input(x):
