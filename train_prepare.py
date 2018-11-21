@@ -52,6 +52,8 @@ GENDER          = 'male'
 MAILABSDIR      = '/home/bofh/projects/ai/data/speech/corpora/m_ailabs_de/de_DE/by_book/%s/%s' % (GENDER, VOICE)
 LANG            = 'de'
 
+TMP_WAV         = 'tmp/tmp.wav'
+
 def _decode_input(x):
 
     global hparams
@@ -137,7 +139,11 @@ for book in os.listdir(MAILABSDIR):
 
         wav_path = '%s/%s/wavs/%s' % (MAILABSDIR, book, wavfn)
 
-        wav = audio.load_wav(wav_path)
+        cmd = 'sox %s %s compand 0.02,0.20 5:-60,-40,-10 -5 -90 0.1' % (wav_path, TMP_WAV)
+        logging.debug(cmd)
+        os.system(cmd)
+
+        wav = audio.load_wav(TMP_WAV)
         wav = audio.trim_silence(wav, hparams)
 
         spectrogram     = audio.spectrogram(wav, hparams).astype(np.float32)
