@@ -184,16 +184,22 @@ def _fgla(S, hparams, alpha=0.99):
     y  = istft(cn, hop_length=hop_length, win_length=win_length)
     return y
 
+def inv_preemphasis(x):
+  return scipy.signal.lfilter([1], [1, -hparams['preemphasis']], x)
+
 def inv_spectrogram(spectrogram, hparams, use_fgla=True):
     S = _db_to_amp(_denormalize(spectrogram, hparams) + hparams['ref_level_db'])  # Convert back to linear
     # Reconstruct phase
     if use_fgla:
-        return _fgla(S ** hparams['power'], hparams)
-    return _griffin_lim(S ** hparams['power'], hparams)
+        return _inv_preemphasis(_fgla(S ** hparams['power'], hparams), hparams)
+    return _inv_preemphasis(_griffin_lim(S ** hparams['power'], hparams), hparams)
+
+def _preemphasis(x, hparams):
+  return scipy.signal.lfilter([1, -hparams['preemphasis']], [1], x)
 
 def spectrogram(y, hparams):
     n_fft, hop_length, win_length = stft_parameters(hparams)
-    D = stft(y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+    D = stft(_preemphasis(y, hparams), n_fft=n_fft, hop_length=hop_length, win_length=win_length)
     S = _amp_to_db(np.abs(D)) - hparams['ref_level_db']
     res = _normalize(S, hparams)
 
@@ -568,8 +574,7 @@ def _mel(sr, n_fft, n_mels=128, fmin=0.0, fmax=None, htk=False, norm=1):
 
 def _build_mel_basis(hparams):
     n_fft = (hparams['num_freq'] - 1) * 2
-    return _mel(hparams['sample_rate'], n_fft, n_mels=hparams['num_mels'],
-                fmin=hparams['min_mel_freq'], fmax=hparams['max_mel_freq'])
+    return _mel(hparams['sample_rate'], n_fft, n_mels=hparams['num_mels'])
 
 def _amp_to_db(x):
     return 20 * np.log10(np.maximum(1e-5, x))
