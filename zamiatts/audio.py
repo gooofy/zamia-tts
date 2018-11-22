@@ -184,7 +184,7 @@ def _fgla(S, hparams, alpha=0.99):
     y  = istft(cn, hop_length=hop_length, win_length=win_length)
     return y
 
-def inv_preemphasis(x):
+def _inv_preemphasis(x, hparams):
   return scipy.signal.lfilter([1], [1, -hparams['preemphasis']], x)
 
 def inv_spectrogram(spectrogram, hparams, use_fgla=True):
