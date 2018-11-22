@@ -151,13 +151,14 @@ for book in os.listdir(MAILABSDIR):
 
         wav_path = '%s/%s/wavs/%s' % (MAILABSDIR, book, wavfn)
 
-        cmd = 'sox %s %s compand 0.02,0.20 5:-60,-40,-10 -5 -90 0.1' % (wav_path, TMP_WAV)
+        # cmd = 'sox %s %s silence -l 1 0.1 1%% -1 2.0 1%% compand 0.02,0.20 5:-60,-40,-10 -5 -90 0.1' % (wav_path, TMP_WAV)
+        cmd = 'sox %s %s silence 1 0.15 0.5%% reverse silence 1 0.15 0.5%% reverse gain -n -3' % (wav_path, TMP_WAV)
         logging.debug(cmd)
         os.system(cmd)
 
         wav = audio.load_wav(TMP_WAV)
-        wav = audio.trim_silence(wav, hparams)
-
+        # FIXME: remove, we're using sox for this now wav = audio.trim_silence(wav, hparams)
+ 
         spectrogram     = audio.spectrogram(wav, hparams).astype(np.float32)
         mel_spectrogram = audio.melspectrogram(wav, hparams).astype(np.float32)
 
