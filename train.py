@@ -36,11 +36,9 @@ from optparse             import OptionParser
 
 from nltools              import misc
 from zamiatts.tacotron    import Tacotron
-from zamiatts             import audio
+from zamiatts             import audio, CHECKPOINT_DIR, EVAL_DIR, VOICE_PATH, HPARAMS_FN, HPARAMS_SRC
 
 PROC_TITLE      = 'train'
-
-VOICE           = 'voices/karlsson'
 
 #
 # init
@@ -70,6 +68,36 @@ if len(args) != 1:
     sys.exit(1)
 
 voice = args[0]
+
+#
+# clean up / setup directory
+#
+
+cmd = 'rm -rf %s' % (VOICE_PATH % voice)
+logging.info(cmd)
+os.system(cmd)
+
+cmd = 'mkdir -p %s' % (VOICE_PATH % voice)
+logging.info(cmd)
+os.system(cmd)
+
+cmd = 'cp %s %s' % (HPARAMS_SRC, HPARAMS_FN % voice)
+logging.info(cmd)
+os.system(cmd)
+
+cmd = 'mkdir -p %s' % (CHECKPOINT_DIR % voice)
+logging.info(cmd)
+os.system(cmd)
+
+cmd = 'mkdir -p %s' % (EVAL_DIR % voice)
+logging.info(cmd)
+os.system(cmd)
+
+
+#
+# training
+#
+
 taco = Tacotron(voice, is_training=True)
 
 taco.train()

@@ -39,11 +39,11 @@ import numpy      as np
 
 from optparse          import OptionParser
 from nltools           import misc
-from zamiatts          import DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_YL, cleanup_text
+from zamiatts          import DSFN_PATH, HPARAMS_SRC, DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_YL, VOICE_PATH, cleanup_text
 from zamiatts          import audio
 
-DEBUG_LIMIT  = 0
-# DEBUG_LIMIT = 65
+# DEBUG_LIMIT  = 0
+DEBUG_LIMIT = 65
 
 PROC_TITLE      = 'train_prepare'
 
@@ -90,10 +90,22 @@ else:
     logging.basicConfig(level=logging.INFO)
 
 #
+# clean up / setup directory
+#
+
+cmd = 'rm -rf %s' % (DSFN_PATH % VOICE)
+logging.info(cmd)
+os.system(cmd)
+
+cmd = 'mkdir -p %s' % (DSFN_PATH % VOICE)
+logging.info(cmd)
+os.system(cmd)
+
+#
 # globals
 #
 
-with codecs.open('voices/%s/hparams.json' % VOICE, 'r', 'utf8') as hpf:
+with codecs.open(HPARAMS_SRC, 'r', 'utf8') as hpf:
     hparams         = json.loads(hpf.read())
 max_inp_len     = hparams['max_inp_len']
 max_num_frames  = hparams['max_iters'] * hparams['outputs_per_step'] * hparams['frame_shift_ms'] * hparams['sample_rate'] / 1000

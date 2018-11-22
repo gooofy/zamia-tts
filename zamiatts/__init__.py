@@ -21,17 +21,22 @@
 
 from nltools.tokenizer import tokenize
 
-DSFN_X          = 'training/%s/x_%04d.npy'
-DSFN_XL         = 'training/%s/xl_%04d.npy'
-DSFN_YS         = 'training/%s/ys_%04d.npy'
-DSFN_YM         = 'training/%s/ym_%04d.npy'
-DSFN_YL         = 'training/%s/yl_%04d.npy'
+DSFN_PATH       = 'data/dst/tts/training/%s'
+DSFN_X          = 'data/dst/tts/training/%s/x_%04d.npy'
+DSFN_XL         = 'data/dst/tts/training/%s/xl_%04d.npy'
+DSFN_YS         = 'data/dst/tts/training/%s/ys_%04d.npy'
+DSFN_YM         = 'data/dst/tts/training/%s/ym_%04d.npy'
+DSFN_YL         = 'data/dst/tts/training/%s/yl_%04d.npy'
+HPARAMS_SRC     = 'data/src/tts/hparams.json'
 
-VOICE_PATH      = 'voices/%s'
-CHECKPOINT_FN   = 'voices/%s/cp/cp%04d'
-WAV_FN          = 'voices/%s/eval/wav_%04d.wav'
-SPEC_FN         = 'voices/%s/eval/spec_%04d.png'
-ALIGN_FN        = 'voices/%s/eval/align_%04d.png'
+VOICE_PATH      = 'data/dst/tts/voices/%s'
+HPARAMS_FN      = 'data/dst/tts/voices/%s/hparams.json'
+CHECKPOINT_DIR  = 'data/dst/tts/voices/%s/cp'
+CHECKPOINT_FN   = 'data/dst/tts/voices/%s/cp/cp%04d'
+EVAL_DIR        = 'data/dst/tts/voices/%s/eval'
+WAV_FN          = 'data/dst/tts/voices/%s/eval/wav_%04d.wav'
+SPEC_FN         = 'data/dst/tts/voices/%s/eval/spec_%04d.png'
+ALIGN_FN        = 'data/dst/tts/voices/%s/eval/align_%04d.png'
 
 def cleanup_text (txt, lang, alphabet):
 

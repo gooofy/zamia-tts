@@ -105,6 +105,5 @@ venv.bak/
 
 0.wav
 foo.txt
-model
 tmp
-
+data/dst
