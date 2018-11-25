@@ -599,7 +599,7 @@ def load_wav(wavfn):
     if wavf.getsampwidth() != 2:
         raise Exception ('16 bit wav needed.')
     if wavf.getframerate() != 16000:
-        raise Exception ('16 kHz wav needed.')
+        raise Exception ('16 kHz wav needed (%f kHz found).' % (wavf.getframerate() / 1000.0))
     
     # read the whole file
 
