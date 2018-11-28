@@ -21,6 +21,8 @@
 
 from nltools.tokenizer import tokenize
 
+WAV_PATH        = 'data/dst/tts/wav/%s'
+
 DSFN_PATH       = 'data/dst/tts/training/%s'
 DSFN_X          = 'data/dst/tts/training/%s/x_%04d.npy'
 DSFN_XL         = 'data/dst/tts/training/%s/xl_%04d.npy'

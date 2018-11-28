@@ -39,7 +39,7 @@ import numpy      as np
 
 from optparse          import OptionParser
 from nltools           import misc
-from zamiatts          import DSFN_PATH, HPARAMS_SRC, DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_YL, VOICE_PATH, cleanup_text
+from zamiatts          import WAV_PATH, DSFN_PATH, HPARAMS_SRC, DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_YL, VOICE_PATH, cleanup_text
 from zamiatts          import audio
 
 DEBUG_LIMIT  = 0
@@ -47,7 +47,6 @@ DEBUG_LIMIT  = 0
 # DEBUG_LIMIT = 512
 
 PROC_TITLE      = 'train_prepare'
-TMP_WAV         = 'tmp/tmp.wav'
 
 def _decode_input(x):
 
@@ -97,11 +96,19 @@ if len(args) != 2:
 voice_in   = args[0]
 voice_out  = args[1]
 lang       = options.lang.split('_')[0]
-mailabsdir = '/home/bofh/projects/ai/data/speech/corpora/m_ailabs_de/%s/by_book/%s/%s' % (options.lang, options.gender, voice_in)
+mailabsdir = '/home/bofh/projects/ai/data/speech/corpora/m_ailabs/%s/by_book/%s/%s' % (options.lang, options.gender, voice_in)
 
 #
-# clean up / setup directory
+# clean up / setup directories
 #
+
+cmd = 'rm -rf %s' % (WAV_PATH % voice_out)
+logging.info(cmd)
+os.system(cmd)
+
+cmd = 'mkdir -p %s' % (WAV_PATH % voice_out)
+logging.info(cmd)
+os.system(cmd)
 
 cmd = 'rm -rf %s' % (DSFN_PATH % voice_out)
 logging.info(cmd)
@@ -161,12 +168,14 @@ for book in os.listdir(mailabsdir):
 
         wav_path = '%s/%s/wavs/%s' % (mailabsdir, book, wavfn)
 
-        # cmd = 'sox %s %s silence -l 1 0.1 1%% -1 2.0 1%% compand 0.02,0.20 5:-60,-40,-10 -5 -90 0.1' % (wav_path, TMP_WAV)
-        cmd = 'sox %s -r 16000 -b 16 -c 1 %s silence 1 0.15 0.5%% reverse silence 1 0.15 0.5%% reverse gain -n -3' % (wav_path, TMP_WAV)
+        tmp_wav = (WAV_PATH % voice_out) + '/' + wavfn
+
+        # cmd = 'sox %s %s silence -l 1 0.1 1%% -1 2.0 1%% compand 0.02,0.20 5:-60,-40,-10 -5 -90 0.1' % (wav_path, tmp_wav)
+        cmd = 'sox %s -r 16000 -b 16 -c 1 %s silence 1 0.15 0.5%% reverse silence 1 0.15 0.5%% reverse gain -n -3' % (wav_path, tmp_wav)
         logging.debug(cmd)
         os.system(cmd)
 
-        wav = audio.load_wav(TMP_WAV)
+        wav = audio.load_wav(tmp_wav)
         # FIXME: remove, we're using sox for this now wav = audio.trim_silence(wav, hparams)
 
         # logging.debug('wav: %s' % wav.shape)
