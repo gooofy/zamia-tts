@@ -40,5 +40,5 @@ rm -r "$DISTDIR/$ARCNAME"
 # upload
 #
 
-echo rsync -avPz --delete --bwlimit=256 data/dist/ goofy:/var/www/html/zamia-tts/
+echo rsync -avPz --delete --bwlimit=256 data/dist/tts/ goofy:/var/www/html/zamia-tts/
 
