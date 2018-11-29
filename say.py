@@ -41,7 +41,8 @@ from zamiatts             import audio
 
 PROC_TITLE      = 'say'
 
-VOICE           = 'karlsson'
+VOICE_PATH      = 'data/model/%s'
+VOICE           = 'voice-karlsson-latest'
 
 #
 # init
@@ -73,11 +74,7 @@ if len(args) != 1:
     parser.print_usage()
     sys.exit(1)
 
-# with codecs.open('hparams.json', 'w', 'utf8') as hpf:
-#     hpf.write(json.dumps(hparams))
-
-
-taco = Tacotron(VOICE, is_training=False)
+taco = Tacotron(VOICE, is_training=False, voice_path=VOICE_PATH)
 
 for i, txt in enumerate(args):
 

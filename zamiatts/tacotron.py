@@ -325,10 +325,10 @@ def _create_post_cbhg(inputs, input_dim, is_training, depth):
                          depth=depth)
 class Tacotron:
 
-    def __init__(self, voice, is_training, eval_batch_size=1, write_debug_files=False):
+    def __init__(self, voice, is_training, eval_batch_size=1, write_debug_files=False, voice_path=VOICE_PATH):
    
         self.voice      = voice
-        self.voice_path = VOICE_PATH % voice
+        self.voice_path = voice_path % voice
 
         self.write_debug_files = write_debug_files
 
