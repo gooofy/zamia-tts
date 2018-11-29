@@ -8,7 +8,7 @@ Links
 ~~~~~
 
 * https://github.com/keithito/tacotron
-* Download voices here: http://goofy.zamia.org/tts/
+* Download voices here: http://goofy.zamia.org/zamia-tts/
 
 Requirements
 ~~~~~~~~~~~~
