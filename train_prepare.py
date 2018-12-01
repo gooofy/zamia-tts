@@ -171,7 +171,8 @@ for book in os.listdir(mailabsdir):
         tmp_wav = (WAV_PATH % voice_out) + '/' + wavfn
 
         # cmd = 'sox %s %s silence -l 1 0.1 1%% -1 2.0 1%% compand 0.02,0.20 5:-60,-40,-10 -5 -90 0.1' % (wav_path, tmp_wav)
-        cmd = 'sox %s -r 16000 -b 16 -c 1 %s silence 1 0.15 0.5%% reverse silence 1 0.15 0.5%% reverse gain -n -3' % (wav_path, tmp_wav)
+        # cmd = 'sox %s -r 16000 -b 16 -c 1 %s silence 1 0.15 0.5%% reverse silence 1 0.15 0.5%% reverse gain -n -3' % (wav_path, tmp_wav)
+        cmd = 'sox %s -r 16000 -b 16 -c 1 %s gain -n -3 silence -l 0 -1 0.2 0.1%%' % (wav_path, tmp_wav)
         logging.debug(cmd)
         os.system(cmd)
 
