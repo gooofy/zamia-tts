@@ -67,16 +67,25 @@ def _decode_input(x):
 misc.init_app (PROC_TITLE)
 
 #
+# config
+#
+
+config = misc.load_config('.speechrc')
+
+speech_corpora_dir = config.get("speech", "speech_corpora")
+wav16              = config.get("speech", "wav16")
+
+#
 # command line
 #
 
-parser = OptionParser("usage: %prog [options] <voice_in> <voice_out>")
+parser = OptionParser("usage: %prog [options] <corpus> <speaker_in> <speaker_out>")
 
 parser.add_option ("-g", "--gender", dest="gender", type = "str", default="male",
                    help="gender (default: male)")
 
-parser.add_option ("-l", "--lang", dest="lang", type = "str", default="de_DE",
-                   help="language (default: de_DE)")
+parser.add_option ("-l", "--lang", dest="lang", type = "str", default="de",
+                   help="language (default: de)")
 
 parser.add_option("-v", "--verbose", action="store_true", dest="verbose", 
                   help="enable debug output")
@@ -89,32 +98,32 @@ if options.verbose:
 else:
     logging.basicConfig(level=logging.INFO)
 
-if len(args) != 2:
+if len(args) != 3:
     parser.print_help()
     sys.exit(0)
 
-voice_in   = args[0]
-voice_out  = args[1]
-lang       = options.lang.split('_')[0]
-mailabsdir = '/home/bofh/projects/ai/data/speech/corpora/m_ailabs/%s/by_book/%s/%s' % (options.lang, options.gender, voice_in)
+corpus       = args[0]
+speaker_in   = args[1]
+speaker_out  = args[2]
+lang         = options.lang
 
 #
 # clean up / setup directories
 #
 
-cmd = 'rm -rf %s' % (WAV_PATH % voice_out)
+cmd = 'rm -rf %s' % (WAV_PATH % speaker_out)
 logging.info(cmd)
 os.system(cmd)
 
-cmd = 'mkdir -p %s' % (WAV_PATH % voice_out)
+cmd = 'mkdir -p %s' % (WAV_PATH % speaker_out)
 logging.info(cmd)
 os.system(cmd)
 
-cmd = 'rm -rf %s' % (DSFN_PATH % voice_out)
+cmd = 'rm -rf %s' % (DSFN_PATH % speaker_out)
 logging.info(cmd)
 os.system(cmd)
 
-cmd = 'mkdir -p %s' % (DSFN_PATH % voice_out)
+cmd = 'mkdir -p %s' % (DSFN_PATH % speaker_out)
 logging.info(cmd)
 os.system(cmd)
 
@@ -168,7 +177,7 @@ for book in os.listdir(mailabsdir):
 
         wav_path = '%s/%s/wavs/%s' % (mailabsdir, book, wavfn)
 
-        tmp_wav = (WAV_PATH % voice_out) + '/' + wavfn
+        tmp_wav = (WAV_PATH % speaker_out) + '/' + wavfn
 
         # cmd = 'sox %s %s silence -l 1 0.1 1%% -1 2.0 1%% compand 0.02,0.20 5:-60,-40,-10 -5 -90 0.1' % (wav_path, tmp_wav)
         # cmd = 'sox %s -r 16000 -b 16 -c 1 %s silence 1 0.15 0.5%% reverse silence 1 0.15 0.5%% reverse gain -n -3' % (wav_path, tmp_wav)
@@ -252,18 +261,18 @@ for i, (ts, S, M) in enumerate(training_data):
 
     if batch_idx == (batch_size-1):
 
-        np.save(DSFN_X % (voice_out, batch_num), input_data)
-        logging.info("%s written. %s" % (DSFN_X % (voice_out, batch_num), input_data.shape))
+        np.save(DSFN_X % (speaker_out, batch_num), input_data)
+        logging.info("%s written. %s" % (DSFN_X % (speaker_out, batch_num), input_data.shape))
 
-        np.save(DSFN_XL % (voice_out, batch_num), input_lengths)
-        logging.info("%s written. %s" % (DSFN_XL % (voice_out, batch_num), input_lengths.shape))
+        np.save(DSFN_XL % (speaker_out, batch_num), input_lengths)
+        logging.info("%s written. %s" % (DSFN_XL % (speaker_out, batch_num), input_lengths.shape))
 
-        np.save(DSFN_YS % (voice_out, batch_num), target_data_s)
-        logging.info("%s written. %s" % (DSFN_YS % (voice_out, batch_num), target_data_s.shape))
+        np.save(DSFN_YS % (speaker_out, batch_num), target_data_s)
+        logging.info("%s written. %s" % (DSFN_YS % (speaker_out, batch_num), target_data_s.shape))
 
-        np.save(DSFN_YM % (voice_out, batch_num), target_data_m)
-        logging.info("%s written. %s" % (DSFN_YM % (voice_out, batch_num), target_data_m.shape))
+        np.save(DSFN_YM % (speaker_out, batch_num), target_data_m)
+        logging.info("%s written. %s" % (DSFN_YM % (speaker_out, batch_num), target_data_m.shape))
 
-        np.save(DSFN_YL % (voice_out, batch_num), target_lengths)
-        logging.info("%s written. %s" % (DSFN_YL % (voice_out, batch_num), target_lengths.shape))
+        np.save(DSFN_YL % (speaker_out, batch_num), target_lengths)
+        logging.info("%s written. %s" % (DSFN_YL % (speaker_out, batch_num), target_lengths.shape))
 
