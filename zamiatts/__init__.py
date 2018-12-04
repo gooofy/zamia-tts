@@ -21,7 +21,7 @@
 
 from nltools.tokenizer import tokenize
 
-WAV_PATH        = 'data/dst/tts/wav/%s'
+HPARAMS_SRC     = 'data/src/tts/hparams_%s.json' 
 
 DSFN_PATH       = 'data/dst/tts/training/%s'
 DSFN_X          = 'data/dst/tts/training/%s/x_%04d.npy'
@@ -29,7 +29,8 @@ DSFN_XL         = 'data/dst/tts/training/%s/xl_%04d.npy'
 DSFN_YS         = 'data/dst/tts/training/%s/ys_%04d.npy'
 DSFN_YM         = 'data/dst/tts/training/%s/ym_%04d.npy'
 DSFN_YL         = 'data/dst/tts/training/%s/yl_%04d.npy'
-HPARAMS_SRC     = 'data/src/tts/hparams.json'
+DSFN_HPARAMS    = 'data/dst/tts/training/%s/hparams.json'
+
 
 VOICE_PATH      = 'data/dst/tts/voices/%s'
 HPARAMS_FN      = 'data/dst/tts/voices/%s/hparams.json'

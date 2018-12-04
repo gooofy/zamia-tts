@@ -27,6 +27,7 @@
 #
 
 import os
+import sys
 import logging
 import json
 import codecs
@@ -48,8 +49,8 @@ from .                          import DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_Y
 import audio
 
 DEBUG_LIMIT        =   0
-# DEBUG_LIMIT        =   2 # debug only
-DEFAULT_NUM_EPOCHS = 300
+# DEBUG_LIMIT        =   128 # debug only
+DEFAULT_NUM_EPOCHS = 1000
 
 def _go_frames(batch_size, output_dim):
     '''Returns all-zero <GO> frames for a given batch size and output dimension'''
@@ -589,46 +590,77 @@ class Tacotron:
 
     def train(self, num_epochs=DEFAULT_NUM_EPOCHS):
 
-        logging.info ('counting numpy batches...')
+        logging.info ('counting steps...')
 
-        num_batches = 0
+        num_steps = 0
         while True:
-            if os.path.exists(DSFN_X % (self.voice, num_batches)):
-                num_batches += 1
+            if os.path.exists(DSFN_X % (self.voice, num_steps)):
+                num_steps += 1
             else:
                 break
 
-        logging.info ('counting numpy batches... %d batches found.' % num_batches)
+        logging.info ('counting steps... %d steps found.' % num_steps)
 
         if DEBUG_LIMIT:
-            logging.warn ('limiting number of batches to %d for debugging' % DEBUG_LIMIT)
-            num_batches = DEBUG_LIMIT
+            logging.warn ('limiting number of steps to %d for debugging' % DEBUG_LIMIT)
+            num_steps = DEBUG_LIMIT
 
-        self._load_batch(0) # make sure we have one batch loaded at all times so batch_*.shape works
+        # self._load_batch(0) # make sure we have one sample loaded at all times so sample_*.shape works
 
         batch_size = self.hp['batch_size']
+        max_inp_len     = self.hp['max_inp_len']
+        max_num_frames  = self.hp['max_iters'] * self.hp['outputs_per_step'] * self.hp['frame_shift_ms'] * self.hp['sample_rate'] / 1000
 
-        batch_idxs = range(0, num_batches)
+        n_fft, hop_length, win_length = audio.stft_parameters(self.hp)
+        max_mfc_frames  = 1 + int((max_num_frames - n_fft) / hop_length)
+
+        batch_x   = np.zeros( (batch_size, max_inp_len), dtype='int32')
+        batch_xl  = np.zeros( (batch_size, ), dtype='int32')
+        batch_ys  = np.zeros( (batch_size, max_mfc_frames, self.hp['num_freq']) , dtype='float32')
+        batch_ym  = np.zeros( (batch_size, max_mfc_frames, self.hp['num_mels']) , dtype='float32')
+        batch_yl  = np.zeros( (batch_size, ), dtype='int32')
+
+        sample_idxs = range(0, num_steps)
+
+        epoch = 0
 
         for epoch in range(num_epochs):
 
-            random.shuffle(batch_idxs)
-            epoch_loss = 0
+            random.shuffle(sample_idxs)
+            epoch_loss  = 0
+            num_batches = 0
 
-            for i, batch_idx in enumerate(batch_idxs):
+            for i, sample_idx in enumerate(sample_idxs):
 
-                self._load_batch(batch_idx)
+                x   = np.load(DSFN_X  % (self.voice, sample_idx))
+                xl  = np.load(DSFN_XL % (self.voice, sample_idx))
+                ys  = np.load(DSFN_YS % (self.voice, sample_idx))
+                ym  = np.load(DSFN_YM % (self.voice, sample_idx))
+                yl  = np.load(DSFN_YL % (self.voice, sample_idx))
 
-                step_out, loss_out, opt_out, spectrogram, alignment = self.sess.run([self.global_step, self.loss, self.optimize, self.linear_outputs, self.alignments],
-                                                                                    feed_dict={self.inputs         : self.batch_x, 
-                                                                                               self.input_lengths  : self.batch_xl,
-                                                                                               self.mel_targets    : self.batch_ym,
-                                                                                               self.linear_targets : self.batch_ys,
-                                                                                               self.target_lengths : self.batch_yl})
+                batch_x [i % batch_size] = x [0]
+                batch_xl[i % batch_size] = xl[0]
+                batch_ys[i % batch_size] = ys[0]
+                batch_ym[i % batch_size] = ym[0]
+                batch_yl[i % batch_size] = yl[0]
 
-                epoch_loss += loss_out
+                if (i % batch_size) == (batch_size-1):
 
-                logging.info ('epoch: %5d, step %4d/%4d batch #%4d, loss: %7.5f, avg loss: %7.5f' % (epoch, i+1, num_batches, batch_idx, loss_out, epoch_loss / (i+1)))
+                    num_batches += 1
+
+                    ts = self._decode_input(x[0])
+                    logging.debug(u'ts %d %s' % (sample_idx, ts))
+
+                    step_out, loss_out, opt_out, spectrogram, alignment = self.sess.run([self.global_step, self.loss, self.optimize, self.linear_outputs, self.alignments],
+                                                                                        feed_dict={self.inputs         : batch_x, 
+                                                                                                   self.input_lengths  : batch_xl,
+                                                                                                   self.mel_targets    : batch_ym,
+                                                                                                   self.linear_targets : batch_ys,
+                                                                                                   self.target_lengths : batch_yl})
+
+                    epoch_loss += loss_out
+
+                    logging.info ('epoch: %5d, step %4d/%4d loss: %7.5f, avg loss: %7.5f' % (epoch, i+1, num_steps, loss_out, epoch_loss / num_batches))
 
             cpfn = CHECKPOINT_FN % (self.voice, epoch)
             logging.info('Saving checkpoint to: %s' % cpfn)
