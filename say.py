@@ -4,7 +4,6 @@
 #
 # Copyright 2018 Guenter Bartsch
 # Copyright 2018 Keith Ito
-# Copyright 2018 MycroftAI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +19,7 @@
 #
 
 #
-# synthesize speech using a tacotron model
+# synthesize speech using a tacotron model, output through pulseaudio
 #
 
 import os
@@ -29,39 +28,72 @@ import sys
 import logging
 import json
 import codecs
+import readline
+import tempfile
 
 import scipy.io.wavfile
 import numpy as np
 
 from optparse             import OptionParser
 
-from nltools              import misc
+from nltools              import misc, pulseplayer
 from zamiatts.tacotron    import Tacotron
 from zamiatts             import audio
 
 PROC_TITLE      = 'say'
 
 VOICE_PATH      = 'data/model/%s'
-VOICE           = 'voice-karlsson-latest'
+# VOICE           = 'voice-karlsson-latest'
+DEFAULT_VOICE   = 'voice-elliot-latest'
+
+def synthesize(txt):
+
+    global taco, options, player
+
+    logging.info('Synthesizing: %s' % txt)
+    wav = taco.say(txt, trim_silence=(not options.untrimmed_output))
+
+    if options.wavfn:
+        audio.save_wav(wav, options.wavfn, taco.hp)
+        logging.info("%s written." % options.wavfn)
+
+    else:
+
+        with tempfile.NamedTemporaryFile() as temp:
+            audio.save_wav(wav, temp.name, taco.hp)
+            temp.flush()
+            temp.seek(0)
+
+            wav = temp.read()
+
+            logging.info("%s written (%d bytes)." % (temp.name, len(wav)))
+
+            player.play(wav, async=True)
 
 #
 # init
 #
 
 misc.init_app(PROC_TITLE)
+readline.set_history_length(1000)
 
 #
 # command line
 #
 
-parser = OptionParser("usage: %prog [options] <text>")
+parser = OptionParser("usage: %prog [options] [<text>]")
+
+parser.add_option("-o", "--output-wav", dest="wavfn", type = "str", 
+                  help="output wav filename, default: output through pulseaudio")
+
+parser.add_option("-V", "--voice", dest="voice", type = "str", default=DEFAULT_VOICE,
+                  help="voice, default: %s" % DEFAULT_VOICE)
 
 parser.add_option("-u", "--untrimmed-output", action="store_true", dest="untrimmed_output", 
                   help="disable silence trimming")
 
 parser.add_option("-v", "--verbose", action="store_true", dest="verbose", 
                   help="enable debug output")
-
 
 (options, args) = parser.parse_args()
 
@@ -70,22 +102,31 @@ if options.verbose:
 else:
     logging.basicConfig(level=logging.INFO)
 
-if len(args) != 1:
-    parser.print_usage()
-    sys.exit(1)
+if not options.wavfn:
+    player = pulseplayer.PulsePlayer(PROC_TITLE)
 
-taco = Tacotron(VOICE, is_training=False, voice_path=VOICE_PATH)
+#
+# main
+#
 
-for i, txt in enumerate(args):
+taco = Tacotron(options.voice, is_training=False, voice_path=VOICE_PATH)
 
-    logging.info('Synthesizing: %s' % txt)
-    wav = taco.say(txt, trim_silence=(not options.untrimmed_output))
+if len(args)>0:
 
-    wavfn = '%d.wav' % i
-    audio.save_wav(wav, wavfn, taco.hp)
+    for i, raw_txt in enumerate(args):
+        txt = raw_txt.decode('utf8')
+        synthesize(txt)
 
-    # wav16 = (32767*wav).astype(np.int16)
-    # scipy.io.wavfile.write(wavfn, taco.hp['sample_rate'], wav16)
+else:
 
-    logging.info("%s written." % wavfn)
+    while True:
 
+        txt = raw_input("%s >" % options.voice)
+
+        txt = txt.strip()
+        if not txt:
+            break
+
+        synthesize(txt.decode('utf8'))
+       
+ 
