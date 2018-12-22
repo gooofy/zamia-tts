@@ -618,7 +618,7 @@ def load_wav(wavfn):
 
 def save_wav(wav, wavfn, hparams):
 
-    wav16 = (32767 * wav).astype(np.int16)
+    wav16 = (32767 * np.clip(wav, -0.999, 0.999)).astype(np.int16)
 
     scipy.io.wavfile.write(wavfn, hparams['sample_rate'], wav16)
 
