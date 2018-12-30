@@ -9,4 +9,4 @@ rsync-from-hal.sh
 0.wav
 foo.txt
 tmp
-data/dst
+data
