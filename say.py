@@ -66,7 +66,7 @@ def synthesize(txt):
 
             wav = temp.read()
 
-            logging.info("%s written (%d bytes)." % (temp.name, len(wav)))
+            logging.debug("%s written (%d bytes)." % (temp.name, len(wav)))
 
             player.play(wav, async=True)
 
