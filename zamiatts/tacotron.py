@@ -481,7 +481,7 @@ class Tacotron:
                 raise Exception ("couldn't load model from %s" % self.cpfn)
                 
 
-    def _decode_input(self, x):
+    def decode_input(self, x):
 
         res = u''
 
@@ -505,7 +505,7 @@ class Tacotron:
 
             input_data[idx, j] = c_enc
 
-        ts = self._decode_input(input_data[idx])
+        ts = self.decode_input(input_data[idx])
         logging.debug(u'decoded input=%s' % ts)
 
         # import pdb; pdb.set_trace()
@@ -551,7 +551,7 @@ class Tacotron:
         # np.set_printoptions(threshold=np.inf)
 
         logging.debug(u'%fs audio.inv_spectrogram...' % (time()-time_start))
-        wav = audio.inv_spectrogram(spectrogram.T, self.hp, use_fgla=True)
+        wav = audio.inv_spectrogram(spectrogram.T, self.hp, use_fgla=False)
 
         logging.debug(u'%fs audio.find_endpoint...' % (time()-time_start))
 
@@ -561,17 +561,6 @@ class Tacotron:
             wav = audio.trim_silence(wav, self.hp)
 
         return wav
-
-    def _load_batch(self, batch_idx):
-
-        self.batch_x       = np.load(DSFN_X  % (self.voice, batch_idx))
-        self.batch_xl      = np.load(DSFN_XL % (self.voice, batch_idx))
-        self.batch_ys      = np.load(DSFN_YS % (self.voice, batch_idx))
-        self.batch_ym      = np.load(DSFN_YM % (self.voice, batch_idx))
-        self.batch_yl      = np.load(DSFN_YL % (self.voice, batch_idx))
-
-        ts = self._decode_input(self.batch_x[0])
-        logging.debug(u'ts %d %s' % (batch_idx, ts))
 
     def _plot_alignment(self, alignment, path, info=None):
         fig, ax = plt.subplots()
@@ -604,8 +593,6 @@ class Tacotron:
         if DEBUG_LIMIT:
             logging.warn ('limiting number of steps to %d for debugging' % DEBUG_LIMIT)
             num_steps = DEBUG_LIMIT
-
-        # self._load_batch(0) # make sure we have one sample loaded at all times so sample_*.shape works
 
         batch_size = self.hp['batch_size']
         max_inp_len     = self.hp['max_inp_len']
@@ -648,7 +635,7 @@ class Tacotron:
 
                     num_batches += 1
 
-                    ts = self._decode_input(x[0])
+                    ts = self.decode_input(x[0])
                     logging.debug(u'ts %d %s' % (sample_idx, ts))
 
                     step_out, loss_out, opt_out, spectrogram, alignment = self.sess.run([self.global_step, self.loss, self.optimize, self.linear_outputs, self.alignments],
@@ -696,49 +683,37 @@ class Tacotron:
 
 
 
-    def eval_batch(self, batch_idx, find_endpoint=True):
-
-        self._load_batch(batch_idx)
+    def eval_batch(self, batch_x, batch_xl):
 
         time_start = time()
 
-        logging.debug('input_data.shape=%s, input_lengths.shape=%s' % (self.batch_x.shape, self.batch_xl.shape))
+        logging.debug('batch_x.shape=%s, batch_xl.shape=%s' % (batch_x.shape, batch_xl.shape))
 
-        logging.debug('x[0]=%s xl[0]=%s' % (self.batch_x[0], self.batch_xl[0]))
-
-        if self.write_debug_files:
-            np.save('eval_x', self.batch_x[0])
-            logging.debug ('eval_x.npy written.')
-            np.save('eval_xl', self.batch_xl[0])
-            logging.debug ('eval_xl.npy written.')
+        # if self.write_debug_files:
+        #     np.save('eval_x', self.batch_x[0])
+        #     logging.debug ('eval_x.npy written.')
+        #     np.save('eval_xl', self.batch_xl[0])
+        #     logging.debug ('eval_xl.npy written.')
 
         logging.debug(u'%fs self.session.run...' % (time()-time_start))
         spectrograms = self.sess.run(fetches   = self.linear_outputs,
                                      feed_dict = {
-                                                  self.inputs       : self.batch_x,
-                                                  self.input_lengths: self.batch_xl,
+                                                  self.inputs       : batch_x,
+                                                  self.input_lengths: batch_xl,
                                                  }
                                      )
         spectrogram = spectrograms[0]
 
         logging.debug('spectrogram.shape=%s' % repr(spectrogram.shape))
-        logging.debug('batch_ys.shape=%s' % repr(self.batch_ys.shape))
 
-        if self.write_debug_files:
-            np.save('eval_spectrogram', spectrogram)
-            logging.debug ('eval_spectrogram.npy written.')
-
-        # np.set_printoptions(threshold=np.inf)
+        # if self.write_debug_files:
+        #     np.save('eval_spectrogram', spectrogram)
+        #     logging.debug ('eval_spectrogram.npy written.')
 
         logging.debug(u'%fs audio.inv_spectrogram...' % (time()-time_start))
         wav = audio.inv_spectrogram(spectrogram.T, self.hp)
 
-        logging.debug(u'%fs audio.find_endpoint...' % (time()-time_start))
-
-        logging.debug(u'%fs wav...' % (time()-time_start))
-        if find_endpoint:
-            audio_endpoint = audio.find_endpoint(wav, self.hp)
-            wav = wav[:audio_endpoint]
+        logging.debug(u'%fs wav.' % (time()-time_start))
 
         return wav
 
