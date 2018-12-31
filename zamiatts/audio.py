@@ -723,6 +723,33 @@ def _trim(y, top_db=60, ref=np.max, frame_length=2048, hop_length=512):
 def trim_silence(wav, hparams):
     return _trim( wav, top_db=hparams['trim_top_db'], frame_length=hparams['trim_fft_size'], hop_length=hparams['trim_hop_size'])[0]
 
+def dyn_range_compress(wav, hparams):
+
+    MAX_GAIN = 20.0
+
+    gain = 1.0
+    
+    ATTACK = 300
+
+    for i in range(wav.shape[0]):
+
+        cur_gain = 1.00 / abs(wav[i])
+
+        if cur_gain > MAX_GAIN:
+            cur_gain = MAX_GAIN
+
+        gain = (ATTACK * gain + cur_gain) / (ATTACK + 1)
+
+        if gain > cur_gain:
+            gain = cur_gain * 0.95
+
+        res = wav[i] * gain
+        # print "wav=%7.5f cur_gain=%7.5f gain=%7.5f res=%7.5f" % (wav[i], cur_gain, gain, res)
+
+        wav[i] = res
+        
+
+    return wav
 
 #########################################################################
 # 

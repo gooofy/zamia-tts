@@ -512,7 +512,7 @@ class Tacotron:
 
         input_lengths[idx] = len(ts) + 1 # +1 for start symbol
 
-    def say(self, txt, trim_silence=True):
+    def say(self, txt, trim_silence=True, dyn_range_compress=True):
 
         time_start = time()
 
@@ -551,15 +551,17 @@ class Tacotron:
         # np.set_printoptions(threshold=np.inf)
 
         logging.debug(u'%fs audio.inv_spectrogram...' % (time()-time_start))
-        wav = audio.inv_spectrogram(spectrogram.T, self.hp, use_fgla=False)
+        wav = audio.inv_spectrogram(spectrogram.T, self.hp, use_fgla=True)
 
-        logging.debug(u'%fs audio.find_endpoint...' % (time()-time_start))
-
-        logging.debug(u'%fs wav...' % (time()-time_start))
+        if dyn_range_compress:
+            logging.debug(u'%fs dynamic range compression...' % (time()-time_start))
+            wav = audio.dyn_range_compress(wav, self.hp)
 
         if trim_silence:
+            logging.debug(u'%fs trim silence...' % (time()-time_start))
             wav = audio.trim_silence(wav, self.hp)
 
+        logging.debug(u'%fs wav.' % (time()-time_start))
         return wav
 
     def _plot_alignment(self, alignment, path, info=None):
