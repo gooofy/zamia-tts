@@ -40,6 +40,11 @@ EVAL_DIR        = 'data/dst/tts/voices/%s/eval'
 WAV_FN          = 'data/dst/tts/voices/%s/eval/wav_%04d.wav'
 SPEC_FN         = 'data/dst/tts/voices/%s/eval/spec_%04d.png'
 ALIGN_FN        = 'data/dst/tts/voices/%s/eval/align_%04d.png'
+BATCH_X_FN      = 'data/dst/tts/voices/%s/eval/batch_x_%04d.npy'
+BATCH_XL_FN     = 'data/dst/tts/voices/%s/eval/batch_xl_%04d.npy'
+BATCH_YS_FN     = 'data/dst/tts/voices/%s/eval/batch_ys_%04d.npy'
+BATCH_YM_FN     = 'data/dst/tts/voices/%s/eval/batch_ym_%04d.npy'
+BATCH_YL_FN     = 'data/dst/tts/voices/%s/eval/batch_yl_%04d.npy'
 
 def cleanup_text (txt, lang, alphabet):
 

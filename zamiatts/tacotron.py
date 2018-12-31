@@ -44,7 +44,7 @@ from tensorflow.contrib.rnn     import GRUCell, RNNCell, MultiRNNCell, OutputPro
 from tensorflow.contrib.seq2seq import AttentionWrapper, BahdanauAttention, Helper, BasicDecoder
 from time                       import time
 from nltools.tokenizer          import tokenize
-from .                          import DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_YL, VOICE_PATH, CHECKPOINT_FN, WAV_FN, SPEC_FN, ALIGN_FN, cleanup_text
+from .                          import DSFN_X, DSFN_XL, DSFN_YS, DSFN_YM, DSFN_YL, VOICE_PATH, CHECKPOINT_FN, WAV_FN, SPEC_FN, ALIGN_FN, BATCH_X_FN, BATCH_XL_FN, BATCH_YS_FN, BATCH_YM_FN, BATCH_YL_FN, cleanup_text
 
 import audio
 
@@ -681,6 +681,17 @@ class Tacotron:
                                  info='epoch=%d, loss=%.5f' % (epoch, loss_out))
             logging.info ('alignment %s plotted to %s' % (alignment[0].shape, plotfn) )
 
+            # save batch as well so we can debug training later if needed
+            np.save(BATCH_X_FN  % (self.voice, epoch), batch_x)
+            logging.info('%s written.' % (BATCH_X_FN  % (self.voice, epoch)))
+            np.save(BATCH_XL_FN % (self.voice, epoch), batch_xl)
+            logging.info('%s written.' % (BATCH_XL_FN % (self.voice, epoch)))
+            np.save(BATCH_YM_FN % (self.voice, epoch), batch_ym)
+            logging.info('%s written.' % (BATCH_YM_FN % (self.voice, epoch)))
+            np.save(BATCH_YS_FN % (self.voice, epoch), batch_ys)
+            logging.info('%s written.' % (BATCH_YS_FN % (self.voice, epoch)))
+            np.save(BATCH_YL_FN % (self.voice, epoch), batch_yl)
+            logging.info('%s written.' % (BATCH_YL_FN % (self.voice, epoch)))
 
 
     def eval_batch(self, batch_x, batch_xl):
