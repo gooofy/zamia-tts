@@ -696,7 +696,7 @@ class Tacotron:
             logging.info('%s written.' % (BATCH_YL_FN % (self.voice, epoch)))
 
 
-    def eval_batch(self, batch_x, batch_xl):
+    def eval_batch(self, batch_x, batch_xl, batch_ym=None, batch_ys=None, batch_yl=None):
 
         time_start = time()
 
@@ -709,12 +709,23 @@ class Tacotron:
         #     logging.debug ('eval_xl.npy written.')
 
         logging.debug(u'%fs self.session.run...' % (time()-time_start))
-        spectrograms = self.sess.run(fetches   = self.linear_outputs,
-                                     feed_dict = {
-                                                  self.inputs       : batch_x,
-                                                  self.input_lengths: batch_xl,
-                                                 }
-                                     )
+        if batch_ym is None:
+            spectrograms = self.sess.run(fetches   = self.linear_outputs,
+                                         feed_dict = {
+                                                      self.inputs       : batch_x,
+                                                      self.input_lengths: batch_xl,
+                                                     }
+                                         )
+        else:
+            step_out, loss_out, opt_out, spectrograms, alignment = self.sess.run([self.global_step, self.loss, self.optimize, self.linear_outputs, self.alignments],
+                                                                                 feed_dict={self.inputs         : batch_x, 
+                                                                                            self.input_lengths  : batch_xl,
+                                                                                            self.mel_targets    : batch_ym,
+                                                                                            self.linear_targets : batch_ys,
+                                                                                            self.target_lengths : batch_yl})
+
+        logging.debug(u'generating wav for %s' % self.decode_input(batch_x[0]))
+
         spectrogram = spectrograms[0]
 
         logging.debug('spectrogram.shape=%s' % repr(spectrogram.shape))
