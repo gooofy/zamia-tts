@@ -44,14 +44,14 @@ PROC_TITLE      = 'say'
 
 VOICE_PATH      = 'data/model/%s'
 # VOICE           = 'voice-karlsson-latest'
-DEFAULT_VOICE   = 'voice-elliot-latest'
+DEFAULT_VOICE   = 'voice-linda-latest'
 
 def synthesize(txt):
 
     global taco, options, player
 
     logging.info('Synthesizing: %s' % txt)
-    wav = taco.say(txt, trim_silence=(not options.untrimmed_output))
+    wav = taco.say(txt, trim_silence=(not options.untrimmed_output), dyn_range_compress=options.dyn_range_compress)
 
     if options.wavfn:
         audio.save_wav(wav, options.wavfn, taco.hp)
@@ -88,6 +88,9 @@ parser.add_option("-o", "--output-wav", dest="wavfn", type = "str",
 
 parser.add_option("-V", "--voice", dest="voice", type = "str", default=DEFAULT_VOICE,
                   help="voice, default: %s" % DEFAULT_VOICE)
+
+parser.add_option("-d", "--dyn-range", action="store_true", dest="dyn_range_compress", 
+                  help="enable dynamic range compression")
 
 parser.add_option("-u", "--untrimmed-output", action="store_true", dest="untrimmed_output", 
                   help="disable silence trimming")
