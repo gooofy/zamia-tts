@@ -112,7 +112,7 @@ if not options.wavfn:
 # main
 #
 
-taco = Tacotron(options.voice, is_training=False, voice_path=VOICE_PATH)
+taco = Tacotron(options.voice, is_training=False, voice_path=VOICE_PATH, tf_device='/cpu:0')
 
 if len(args)>0:
 

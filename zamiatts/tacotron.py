@@ -487,11 +487,16 @@ class Tacotron:
             self.epoch_start = int(os.path.basename(latest_cp).split('-')[0][2:]) + 1
 
         else:
-            if is_training:
-                logging.debug ('couldn\'t restore variables from %s -> initializing fresh training run.' % self.cpfn)
-                self.sess.run(tf.global_variables_initializer())
+            self.cpfn  = '%s/model' % self.voice_path
+            if os.path.exists('%s.index' % self.cpfn):
+                logging.debug ('restoring variables from %s ...' % self.cpfn)
+                self.saver.restore(self.sess, self.cpfn)
             else:
-                raise Exception ("couldn't load model from %s" % self.cpfn)
+                if is_training:
+                    logging.debug ('couldn\'t restore variables from %s -> initializing fresh training run.' % self.cpfn)
+                    self.sess.run(tf.global_variables_initializer())
+                else:
+                    raise Exception ("couldn't load model from %s" % self.cpfn)
                 
 
     def decode_input(self, x):
