@@ -50,7 +50,9 @@ import audio
 
 DEBUG_LIMIT        =   0
 # DEBUG_LIMIT        =   128 # debug only
-DEFAULT_NUM_EPOCHS = 1000
+DEFAULT_NUM_EPOCHS = 250
+
+DEFAULT_DEVICE     = '/device:GPU:0'
 
 def _go_frames(batch_size, output_dim):
     '''Returns all-zero <GO> frames for a given batch size and output dimension'''
@@ -326,7 +328,7 @@ def _create_post_cbhg(inputs, input_dim, is_training, depth):
                          depth=depth)
 class Tacotron:
 
-    def __init__(self, voice, is_training, eval_batch_size=1, write_debug_files=False, voice_path=VOICE_PATH):
+    def __init__(self, voice, is_training, eval_batch_size=1, write_debug_files=False, voice_path=VOICE_PATH, tf_device=DEFAULT_DEVICE):
    
         self.voice      = voice
         self.voice_path = voice_path % voice
@@ -342,22 +344,24 @@ class Tacotron:
         n_fft, hop_length, win_length = audio.stft_parameters(self.hp)
         self.max_mfc_frames  = 1 + int((max_num_frames - n_fft) / hop_length)
 
-        # self.inputs        = tf.placeholder(dtype = tf.int32, shape = [None, self.hp['max_inp_len']])
-        # self.input_lengths = tf.placeholder(dtype = tf.int32, shape = [None])
-        self.inputs        = tf.placeholder(dtype = tf.int32, shape = [self.batch_size, self.hp['max_inp_len']])
-        self.input_lengths = tf.placeholder(dtype = tf.int32, shape = [self.batch_size])
-        logging.debug('inputs: %s' % self.inputs)
-        logging.debug('input_lengths: %s' % self.input_lengths)
+        with tf.device(tf_device):
 
-        # self.mel_targets    = tf.placeholder(tf.float32, [None, self.max_mfc_frames, self.hp['num_mels']], 'mel_targets')
-        # self.linear_targets = tf.placeholder(tf.float32, [None, self.max_mfc_frames, self.hp['num_freq']], 'linear_targets')
-        # self.target_lengths = tf.placeholder(tf.int32,   [None],                                           'target_lengths')
-        self.mel_targets    = tf.placeholder(tf.float32, [self.batch_size, self.max_mfc_frames, self.hp['num_mels']], 'mel_targets')
-        self.linear_targets = tf.placeholder(tf.float32, [self.batch_size, self.max_mfc_frames, self.hp['num_freq']], 'linear_targets')
-        self.target_lengths = tf.placeholder(tf.int32,   [self.batch_size],                                           'target_lengths')
-        logging.debug('mel_targets: %s' % self.mel_targets)
-        logging.debug('linear_targets: %s' % self.linear_targets)
-        logging.debug('targets_lengths: %s' % self.target_lengths)
+            # self.inputs        = tf.placeholder(dtype = tf.int32, shape = [None, self.hp['max_inp_len']])
+            # self.input_lengths = tf.placeholder(dtype = tf.int32, shape = [None])
+            self.inputs        = tf.placeholder(dtype = tf.int32, shape = [self.batch_size, self.hp['max_inp_len']])
+            self.input_lengths = tf.placeholder(dtype = tf.int32, shape = [self.batch_size])
+            logging.debug('inputs: %s' % self.inputs)
+            logging.debug('input_lengths: %s' % self.input_lengths)
+
+            # self.mel_targets    = tf.placeholder(tf.float32, [None, self.max_mfc_frames, self.hp['num_mels']], 'mel_targets')
+            # self.linear_targets = tf.placeholder(tf.float32, [None, self.max_mfc_frames, self.hp['num_freq']], 'linear_targets')
+            # self.target_lengths = tf.placeholder(tf.int32,   [None],                                           'target_lengths')
+            self.mel_targets    = tf.placeholder(tf.float32, [self.batch_size, self.max_mfc_frames, self.hp['num_mels']], 'mel_targets')
+            self.linear_targets = tf.placeholder(tf.float32, [self.batch_size, self.max_mfc_frames, self.hp['num_freq']], 'linear_targets')
+            self.target_lengths = tf.placeholder(tf.int32,   [self.batch_size],                                           'target_lengths')
+            logging.debug('mel_targets: %s' % self.mel_targets)
+            logging.debug('linear_targets: %s' % self.linear_targets)
+            logging.debug('targets_lengths: %s' % self.target_lengths)
 
         # Embeddings
         embedding_table = tf.get_variable('embedding', [len(self.hp['alphabet']), self.hp['embed_depth']], dtype=tf.float32,
@@ -469,13 +473,22 @@ class Tacotron:
 
         self.sess  = tf.Session()
 
-        self.cpfn  = '%s/model' % self.voice_path
+        self.cpfn  = '%s/cp' % self.voice_path
 
-        if os.path.exists('%s.index' % self.cpfn):
-            logging.debug ('restoring variables from %s ...' % self.cpfn)
-            self.saver.restore(self.sess, self.cpfn)
+        # find latest checkpoint
+
+        latest_cp = tf.train.latest_checkpoint(self.cpfn)
+        self.epoch_start = 0
+        if latest_cp:
+            logging.debug ('restoring variables from %s ...' % latest_cp)
+            self.saver.restore(self.sess, latest_cp)
+
+            # extract epoch number from filename
+            self.epoch_start = int(os.path.basename(latest_cp).split('-')[0][2:]) + 1
+
         else:
             if is_training:
+                logging.debug ('couldn\'t restore variables from %s -> initializing fresh training run.' % self.cpfn)
                 self.sess.run(tf.global_variables_initializer())
             else:
                 raise Exception ("couldn't load model from %s" % self.cpfn)
@@ -611,9 +624,8 @@ class Tacotron:
 
         sample_idxs = range(0, num_steps)
 
-        epoch = 0
-
-        for epoch in range(num_epochs):
+        for epoch_idx in range(num_epochs):
+            epoch = self.epoch_start + epoch_idx
 
             random.shuffle(sample_idxs)
             epoch_loss  = 0
